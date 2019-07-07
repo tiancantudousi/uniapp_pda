@@ -1,0 +1,405 @@
+<template>
+	<view class="maincontent">
+		<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+		<view class="home-content" style="position:relative;">
+			<!-- 单独header组件 -->
+
+			<navhearder @stepClick="stepClick" :buttonList="['申领','直接','统计']" :loginForm="loginForm"></navhearder>
+			<provideDirect v-if="activeIndex==1"></provideDirect>
+			<cencus v-if="activeIndex==2" @showdetail="showcencusdetail"></cencus>
+			
+			<view style="flex:1;width:750px;" v-if="activeIndex==0" @click="closeSelect">
+				<view class="flexaround input-row  border-bottom" style="justify-content: center;">
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">  
+						<input v-model="startTime" style="height:60px;flex:1;" class="input" type="date" @change="datechange('start')"
+						 placeholder="日期" />
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="endTime" style="height:60px;flex:1;" class="input" type="date" @change="datechange('end')"
+						 placeholder="日期" />
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+				</view>
+				<view class="flexaround input-row border-bottom">
+					<view class="flexaround paddingimage" @click="showSelect('buildSelect')" style="flex:1;align-items: center;">
+						<text style="flex:none;font-size:35px;">大楼:</text>
+						<text style="flex:1;height:60px;line-height:60px;font-size:35px;">{{build.dlname}}</text>
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexaround paddingimage" @click="showSelect('floorSelect')" style="flex:1;align-items: center;">
+						<text style="flex:none;font-size:35px;">楼层:</text>
+						<text style="flex:1;height:60px;line-height:60px;font-size:35px;">{{floorName}}</text>
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+				</view>
+				<view class="flexaround input-row border-bottom">
+					<view class="flexaround paddingimage" @click="showSelect('deptSelect')" style="flex:2;align-items: center;">
+						<text style="flex:none;font-size:35px;">科室:</text>
+						<input style="height:60px;flex:1;" type="text" @focus="showSelect('deptSelect')" v-model="dept" placeholder="科室" @input="onsearchdept($event)"></input>
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexaround" style="flex:1;align-items: center;">
+						<!-- <wxc-button text="备注" type="blue" :btn-style="{width:'120px',height:'80px;'}" :text-style="{fontSize:'30px',color:'white'}" @wxcButtonClicked="wxcButtonClicked"></wxc-button> -->
+					</view>
+				</view>
+
+				<view class="main-list">
+					<scroller class="scroller">
+						<view style="width:750px;padding:20px;flex-direction:row;align-items:center;" v-for="(item,index) in provideList" :key="index" :class="[item.isjj=='1'?'activejj':'']" class="border-bottom" @click="showdetail(item)">
+								<text style="font-size:35px;flex:1;margin-left:10px;" :class="[item.isjj=='1'?'activewhite':'']">{{item.deptname}}</text>
+								
+								<text style="font-size:35px;flex:1;margin-left:10px;" :class="[item.isjj=='1'?'activewhite':'']" v-if="item.isjj=='1'">加急</text>
+								<text style="font-size:35px;margin-right:10px;" :class="[item.isjj=='1'?'activewhite':'']">{{item.sl_dt}}</text>
+								<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+						</view>
+						<loadingmore v-if="provideList.length" :loadingType="'2'"></loadingmore>
+					</scroller>
+
+				</view>
+
+			
+				<scrollerComponent :showpleaseSlect="true" :listshow="buildSelect" @chose="onChoosebuild" :width="'380'" :height="'300'"
+				 :left="'20'" :top="'170'" :dataList="builds" :lable="'dlname'"></scrollerComponent>
+				<scrollerComponent :showpleaseSlect="true" :listshow="floorSelect" @chose="onChoosefloor" :width="'380'" :height="'300'"
+				 :left="'360'" :top="'170'" :dataList="floors" :lable="'lcname'"></scrollerComponent>
+				<scrollerComponent :showpleaseSlect="true" :listshow="deptSelect" @chose="onChoosedept" :width="'420'" :height="'350'"
+				 :left="'20'" :top="'260'" :dataList="kslist" :lable="'de_deptname'"></scrollerComponent>
+			
+
+
+				<wxc-loading :show="loading"></wxc-loading>
+				
+			</view>
+			<!-- 统计页面 -->
+<!-- 			<cencusComponent v-if="activeIndex==1" :todayReclaimNum="todayReclaimNum"></cencusComponent>
+			<reclaimDetail v-if="showdetailitem" @closeDetail="showdetailitem=false" :item="activeitem"></reclaimDetail> -->
+            <provideDetail v-if="showprovideDetail" :item="activecencusitem" :name="'发放明细'" @closeDetail="showprovideDetail=false"></provideDetail>
+		</view>
+		
+
+	</view>
+</template>
+
+
+<script>
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage')
+	import {
+		WxcButton,
+		WxcLoading,
+		WxcDialog
+	} from 'weex-ui';
+	import Navhearder from '../_mods/navhearder.nvue';
+	import loadingmore from '../_mods/loading-more.nvue';
+	import scrollerComponent from '../_mods/scroller.nvue';
+// 	import cencusComponent from './components/cencus.nvue';
+	import provideDirect from "./components/provide-direct.nvue";
+	import cencus from "./components/cencus.nvue";
+	import provideDetail from "./components/provide-detail.nvue"
+// 
+// 	import reclaimDetail from "./components/reclaim-detail.nvue";
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	import {
+		datewarnmixins
+	} from "../../common/datewarnmixins.js";
+	// import * as _ from '../../common/lodash.min.js';
+	import {
+		getbuilds,
+		getfloors,
+		getdeptbyfloor,
+	    getprovideList
+	} from "../../common/api.js";
+
+
+
+	export default {
+		mixins: [myMixin,datewarnmixins],
+		components: {
+			Navhearder,
+			WxcButton,
+			scrollerComponent,
+			WxcLoading,
+			loadingmore,
+			WxcDialog,
+			provideDirect,
+			cencus,
+			provideDetail
+
+		},
+		data() {
+			return {
+				startTime:'',
+				endTime:'',
+				loading: false,
+				page: 1,
+				pageSize: 20,
+				loginForm: {},
+				loadingType: 0,
+				build: {},
+				floorName: '',
+				floorlcbh: '',
+				floorSelect: false,
+				deptSelect: false,
+				buildSelect: false,
+				builds: [],
+				floors: [],
+
+				deptlist: [],
+				dept:'',
+
+				activeIndex: 0,
+				kslist: [],
+				deptId: '',
+				provideList:[],
+				showprovideDetail:false,
+				activecencusitem:''
+
+
+
+
+			}
+		},
+
+		created() {
+			this.setbarheight();
+			this.getsystime().then(res=>{
+				this.startTime=res.slice(0,11);
+				this.endTime=res.slice(0,11);
+				storage.getItem('loginForm', event => {
+				  this.loginForm = JSON.parse(event.data);
+				  this.getbuilds();
+				  this.getprovideList();
+				
+				})
+			})
+			storage.getItem('deptlist', event => {
+				this.deptlist = JSON.parse(event.data);
+				this.searchList('');
+			})
+		},
+
+		methods: {
+	        showcencusdetail(item){
+				this.showprovideDetail=true;
+				this.activecencusitem=item;
+			},
+			showdetail(item){
+				storage.setItem('providedept',{...item,startTime:this.startTime,endTime:this.endTime}, event => { 
+					   uni.navigateTo({
+						url: '/pages/providedetail/providedetail'
+					});
+				})
+				
+			},
+            getprovideList(){
+            	this.provideList = [];
+				this.loading=true;
+            	const data={"SlDtl":{"did":this.deptId,"end_dt":this.endTime.trim()+" 23:59:59","ffList":[],"hb_num":0,"jb_num":0,"jsb_num":0,"start_dt":this.startTime.trim()+" 00:00:00"},"LoginForm":this.loginForm};
+            	getprovideList(data).then(res=>{
+            		this.loading=false;
+            		if(res.status=="OK"){
+            			if(!res.returnValue.FfList.length){
+            				modal.toast({message:'未查询到相关记录!'})
+            				return;
+            			}
+            			this.provideList=res.returnValue.FfList;
+            			this.subtime(this.provideList);
+            		}else{
+            			modal.toast({message:res.message})
+            		}
+            	})
+            },
+			subtime(list){
+				list.forEach(item=>{
+					item.sl_dt=item.sl_dt.substring(11,item.sl_dt.length);
+				})
+			},
+		    datechange(timestate){
+		    	
+		    	if(this.warningdate({'start':this.startTime,'end':this.endTime})){
+		    		timestate=='end'?modal.toast({message:'结束时间不得小于开始时间！'}):modal.toast({message:'开始时间不得大于结束时间！'});
+		    		return;
+		    	}
+		        this.getprovideList();
+		    },
+
+			onChoosedept(item) {
+				this.deptSelect = false;
+				if (this.deptId == item.de_deptid) {
+					return;
+				}
+				this.toReclaimList = [];
+				this.dept = item.de_deptname;
+				this.deptId = item.de_deptid;
+
+				this.getprovideList();
+			},
+			getdeptbyfloor() {
+
+				const data = {
+					"Kslcgx": {
+						"dlbh": this.build ? this.build.dlbh : '',
+						"lcbh": this.floorlcbh
+					},
+					"LoginForm": this.loginForm
+				}
+				console.log(data);
+				getdeptbyfloor(data).then(res => {
+					console.log(JSON.stringify(res));
+					this.deptlist = res.returnValue.ksxxList.map(item => {
+						return {
+							de_deptname: item.deptname,
+							de_deptid: item.deptid,
+							alph: item.alph
+						};
+					});
+					this.searchList(''); //默认取前15个
+				})
+			},
+			onsearchdept(e) {
+				this.deptSelect = true;
+				this.searchList(e.value);
+			},
+			searchList(e) {
+				console.log(e);
+
+				this.searchDeptsthrottle(e, this.deptlist).then(res => {
+					console.log(JSON.stringify(res));
+					this.kslist = res;
+				}).catch((e) => {
+					console.log(e);
+				})
+			},
+			getfloors() {
+				this.floors = [];
+				const data = {
+					"Lcxx": {
+						"dlbh": this.build.dlbh
+					},
+					"LoginForm": this.loginForm
+				};
+				getfloors(data).then(res => {
+
+					this.floors = res.returnValue.lcxxList.map(item => {
+						return {
+							lcname: item.lcname,
+							lcbh: item.lcbh
+						}
+					});
+					console.log(res, 'floors');
+				})
+			},
+			getbuilds() {
+				const data = {
+					"Dlxx": {},
+					"LoginForm": this.loginForm
+				};
+				getbuilds(data).then(res => {
+					if (res.status == "OK" && res.returnValue) {
+						this.builds = res.returnValue.dlxxList.map(item => {
+							return {
+								dlname: item.dlname,
+								dlbh: item.dlbh
+							};
+						});
+					} else {
+						modal.toast({
+							message: '楼层获取失败'
+						});
+					}
+				})
+			},
+			onChoosefloor(item) {
+				this.floorSelect = false;
+				if (this.floorlcbh == item.lcbh) {
+					return;
+				}
+				this.dept = '';
+				this.floorName = item.lcname;
+				this.floorlcbh = item.lcbh;
+				this.getdeptbyfloor();
+				console.log(item);
+			},
+			onChoosebuild(item) {
+				this.buildSelect = false;
+				if (this.build == item) {
+					return;
+				}
+
+				this.build = item;
+				this.floorName = '请选择';
+				this.floorlcbh = '';
+
+
+
+				this.dept = '';
+				if (item.dlbh) {
+					this.getdeptbyfloor();
+					this.getfloors();
+				} else {
+					storage.getItem('deptlist', event => {
+						//设置默认科室列表为登录页科室列表
+						this.deptlist = JSON.parse(event.data);
+						this.searchList('');
+					})
+					this.floors = [];
+
+				}
+			},
+			closeSelect() {
+				this.deptSelect = false;
+				this.floorSelect = false;
+				this.buildSelect = false;
+			},
+			showSelect(name) {
+				if (name != "floorSelect") {
+					this.floorSelect = false;
+				}
+				if (name != "deptSelect") {
+					this.deptSelect = false;
+				}
+				if (name != "buildSelect") {
+					this.buildSelect = false;
+				}
+				setTimeout(() => {
+					this[name] = !this[name];
+				}, 20)
+
+			},
+			resetparmas() {
+				this.page = 1;
+				this.accontNum = 0;
+				this.toReclaimList = [];
+			},
+			scrolltoBottom() {
+				this.page++;
+				this.loadingType = 1;
+				this.getToreclaim();
+			},
+			stepClick(index) {
+				this.activeIndex = -1;
+				setTimeout(() => {
+					this.activeIndex = index;
+				}, 1)
+			},
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style scoped>
+	.activewhite{
+		color:white;
+	}
+	.bottom-button {
+		width: 750px;
+		height: 90px;
+		flex-direction: row;
+	}
+		.activejj{
+		background-color: #F5A623;
+		color:white;
+	}
+</style>

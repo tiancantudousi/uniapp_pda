@@ -1,0 +1,70 @@
+<template>
+	<scroller class="scroller" :style="{height:height+'px',width:width+'px',top:top+'px',left:left+'px',bottom:bottom+'px'}" v-if="dataList.length&&listshow">
+		<div class="listItem" v-if="showpleaseSlect"  @click.stop="chose(null)" :key="zhangfeng">
+			<text class="text" style="font-size:35px;">请选择 </text>
+		</div>
+		<div class="listItem" v-for="(item, itemIndex) in dataList" @click.stop="chose(item)" :key="itemIndex">
+			<text class="text" style="font-size:35px;"> {{item[lable]}}</text>
+		</div>
+	</scroller>
+</template>
+
+<script>
+	export default {
+		props: {
+			'width':String,
+			'height':String,
+			'top':String,
+			'left':String,
+			'bottom':String,
+			'right':String,
+			'dataList': Array,
+			'lable': String,
+			'listshow':{
+				type:Boolean,
+				default: false
+			},
+			'showpleaseSlect':{
+				type:Boolean,
+				default: false
+			}
+		},
+		methods: {
+		
+			chose(item) {
+				if(!item){
+					item={};
+					item[this.lable]="请选择";
+				}
+				this.$emit('chose', item);
+			},
+		
+		}
+	}
+</script>
+
+<style>
+	.scroller {
+	/* 	height: 300px;
+		width: 580px;
+		top: 110px;
+		left: 50px; */
+		position: absolute;
+		border-color:#E5E5E5;
+		border-width:1px;
+		border-style: solid;
+		border-radius: 5px;
+		background-color: white;
+	}
+	.listItem {
+		padding: 20px 0 20px 20px;
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	
+	}
+	
+	.listItem:first-child {
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+</style>

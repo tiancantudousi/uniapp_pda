@@ -1,0 +1,215 @@
+<template>
+	<view style="width:750px;position:absolute;left:0;top:0;background-color: white;" :style="{height:mainContentHeight+'wx'}" @click="closeall">
+			<view class="head border-bottom" style="background-color: #0080FF;">
+				<text style="font-size:35px;color:white;" @click="closepackadd(false)">取消</text>
+				<text style="font-size:35px;color:white;" @click="closepackadd(true)">确定</text>
+			</view>
+			<view style="width:750px;flex:1;">
+                 <view class="flexcenter input-row border-bottom" style="align-items: center;">
+					 <text style="font-size:30px;">{{personname}}</text>
+				 </view>
+
+				<view class="flexaround input-row border-bottom" style="align-items: center;">			
+						 <input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="bednum" placeholder="请录入床位号" ></input>
+				</view>
+				<view class="flexaround input-row border-bottom" style="align-items: center;">			
+						 <input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="suryname" placeholder="请录入手术名称" ></input>  
+				</view>
+				<view class="flexaround input-row border-bottom" style="align-items: center;">	
+						
+						 <input class="input" style="height:60px;flex:1;margin-left:30px;" type="date" v-model="surytimedate" placeholder="请选择手术日期" ></input>
+						 <input class="input" style="height:60px;flex:1;margin-left:30px;" type="time" v-model="surytime" placeholder="请选择手术时间" ></input>
+				</view>
+				<view class="flexaround input-row border-bottom" style="align-items: center;">			
+					<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="surymain" return-key-type="search"  @input="surymainname=''" @return="getuserInfor('surymain')" placeholder="请录入主刀医生" ></input>
+						<text style="flex:1;font-size:30px;">{{surymainname}}</text> 
+				</view>
+				<view class="flexaround input-row border-bottom" style="align-items: center;">			
+						 <input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="surydocter" return-key-type="search"  @input="surydoctername=''" @return="getuserInfor('surydocter')" placeholder="请录入手术医生" ></input>
+						 	<text style="flex:1;font-size:30px;">{{surydoctername}}</text>
+				</view>
+				<!-- <view class="flexaround input-row border-bottom" style="align-items: center;">
+				
+				    <input style="height:60px;flex:1;margin-left:30px;" type="number" v-model="packnum" placeholder="请录入包数量"></input>
+					<input style="height:60px;flex:1;margin-left:30px;" type="number" v-model="mnum" placeholder="请录入器械数量"></input>
+				</view>
+		
+			
+				 <scrollerComponent :listshow="packSelect" @chose="onChoosepack"  :width="'450'" :height="'400'" :left="'20'" :top="'80'" :dataList="packlist" :lable="'bmc'"></scrollerComponent> -->
+				
+				 
+			</view>
+			
+		
+			
+			
+
+<!-- 		<wxc-dialog :title="'包条码：'+tmid"
+		            :content="messagecontent"
+		            :show="showdialog"
+		            @wxcDialogCancelBtnClicked="showdialog=false"
+		            @wxcDialogConfirmBtnClicked="dialogConfirmBtnClick"
+		          ></wxc-dialog>
+		<wxc-loading :show="loading"></wxc-loading>	 -->	
+		<!-- <addpackComponent v-if="showaddpack"></addpackComponent> -->
+	</view>
+</template>
+
+
+<script>
+	
+	
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage')
+	// import {} from 'weex-ui';
+
+	// import listItem from "./components/list-item.nvue";
+// 		import scrollerComponent from '../../_mods/scroller.nvue';
+// 		import addpackComponent from './addpack.nvue';
+	// import reclaimDetail from "../reclaim/components/reclaim-detail.nvue";
+	
+	
+	import {
+		myMixin
+	} from "../../../common/mixins.js";
+	import * as _ from '../../../common/lodash.min.js';
+	import {
+    	 searchPacknvue,getuserInfor
+	} from "../../../common/api.js";
+
+
+	  
+
+		
+	export default {
+		props:['personinformation'],
+		mixins: [myMixin],
+		components: {},
+		data() {
+			return {
+				bednum:'',
+				mainContentHeight:'2000',
+				loginForm:{},
+				suryname:'',
+				surytime:'',
+				surymain:'',
+				surydocter:'',
+				surytimedate:'',
+				personname:'',
+				surymainname:'',
+				surydoctername:''
+			}
+		},
+	
+		created() {
+            this.getmaincontentheight();
+			this.personname=this.personinformation.personName;
+			this.bednum=this.personinformation.bedNum?this.personinformation.bedNum:'';
+			this.suryname=this.personinformation.ssName?this.personinformation.ssName:'';
+			this.surymain=this.personinformation.mainDocter?this.personinformation.mainDocter:'';
+			this.surydocter=this.personinformation.ssDocter?this.personinformation.ssDocter:'';
+			if(this.personinformation.ssTime){
+				this.surytimedate=this.personinformation.ssTime.split(' ')[0]
+				this.surytime=this.personinformation.ssTime.split(' ')[1]
+			}
+			// personName:this.personName, bedNum:this.bedNum, ssName:this.ssName, ssTime:this.ssTime, mainDocter:this.mainDocter, ssDocter:this.ssDocter
+			storage.getItem('loginForm', event => {
+			    this.loginForm = JSON.parse(event.data);
+			})
+		},
+			
+		methods: {
+			getuserInfor(name){
+				const data={"Userinfo":{"us_userid":this[name]},"LoginForm":this.loginForm};
+				getuserInfor(data).then(res=>{
+					console.log('getuserInfor');
+					console.log(JSON.stringify(res));
+					 if(res.status=="OK"){
+						 if(name=='surymain'){
+							this.surymainname=res.returnValue.Userinfo.us_username
+							   
+						 }else{
+							 this.surydoctername=res.returnValue.Userinfo.us_username
+							 
+						 }
+					 }
+				})
+			},
+		
+			async getmaincontentheight(){
+				this.mainContentHeight=await this.getmainContentHeight();
+			},
+			closepackadd(state){
+				if(state){
+					const data={bedNum:this.bednum,ssName:this.suryname,ssTime:this.surytimedate+' '+this.surytime, mainDocter:this.surymainname,mainDocterid:this.surymain,ssDocterid:this.surydocter, ssDocter:this.surydoctername}
+					this.$emit('closepackadd',data);
+				}else{
+					this.$emit('closepackadd',null);
+				}
+				
+			},
+					
+		
+
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+<style scoped>
+	.head {
+		padding: 20px 30px 20px 30px;;
+		position: relative;
+		flex: none;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+	.close-img {
+		width: 40px;
+		height: 40px;
+	}
+	.same-button{
+		   font-size:45px;
+		   text-align: center;
+		   color:white;
+		   height:90px;
+		   line-height:90px;
+		   background-color: #0080FF;
+	}
+	  .bottom-button{
+		   width:750px;
+		   height:90px;
+		   flex-direction: row;
+	}
+
+	.maincontent {
+		display: flex;
+		flex: 1;
+		width: 750px;
+		flex-direction: column;
+	}
+	.home-content{
+		/* background-color: red; */
+		flex:1;
+		width:750px;
+		position:relative;
+	}
+	.border-bottom{
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+	.input-row{
+		height:90px;
+		width:750px;
+		padding:0 25px;
+	}
+
+  .main-list{
+	 
+	 flex:1;
+   }
+ 
+  
+</style>
+
+

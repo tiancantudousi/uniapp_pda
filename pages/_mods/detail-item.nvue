@@ -1,0 +1,55 @@
+<template>
+	<view style="width:750px;padding:10px;" class="top-list-item border-bottom">
+		 <view class="top-item-content" style="padding-left:10px;flex:1;">
+			 <view style="flex-direction: row;align-items: center;justify-content: space-between;flex:1;">
+				  <view>
+				 		<text style="font-size:35px;">{{item.bmc}}</text>
+				 </view>
+				 <view style="flex:none;">
+				 		<text style="font-size:35px;">{{item.tmid}}</text>
+				 </view>
+			 </view>
+			  
+			 <view style="flex-direction: row;align-items: center;justify-content: space-between;flex:1;">
+				  <view>
+				 		<text style="font-size:35px;">{{item.pb_uname}}</text>
+				 </view>
+				 <view style="flex:none;">
+				 		<text style="font-size:35px;">{{item.pb_dt}}</text>
+				 </view>
+			 	
+			 </view>
+			  
+			  <view v-if="item.db_uname">
+					<text style="font-size:35px;">{{item.db_uname}}</text>
+			 </view>
+			 			
+			 	
+			
+		<!-- 	 <view style="flex-direction: row;align-items: center;justify-content: space-between;flex:1;">
+			 				  <view>
+			 				 		<text style="font-size:35px;">{{item.tmid}}</text>
+			 				 </view>
+			 				 <view style="flex:none;">
+			 				 		<text style="font-size:35px;">{{item.xq_start}}</text>
+			 				 </view>
+			 	
+			 </view> -->
+		
+		 </view>
+	</view>
+</template>
+
+<script>
+	export default {
+		props: ['item']
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style>
+       .top-list-item{
+      	   padding:0 20px;
+      	   flex-direction: row;
+      	   align-items: center;
+      }
+</style>

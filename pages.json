@@ -1,0 +1,124 @@
+{
+    "pages" : [
+	
+	
+		{
+		    "path" : "pages/login/login"
+		},
+		{
+		    "path" : "pages/home/home"
+		},
+				{
+			"path" : "pages/reclaim/reclaim"
+		},
+
+   
+        {
+            "path" : "pages/sterilization/sterilization",
+            "style" : {}
+        },
+        {
+            "path" : "pages/pack/pack",
+            "style" : {}
+        },
+        {
+            "path" : "pages/todayreclaim/todayreclaim"
+        },
+        {
+            "path" : "pages/wash/wash"
+        },
+        {
+            "path" : "pages/washfree/washfree",
+            "style" : {}
+        },
+        {
+            "path" : "pages/washing/washing",
+            "style" : {}
+        },
+
+        {
+            "path" : "pages/washcheck/washcheck",
+            "style" : {}
+        },
+        {
+            "path" : "pages/washresult/washresult",
+            "style" : {}
+        },
+        {
+            "path" : "pages/composite/composite",
+            "style" : {}
+        },
+        {
+            "path" : "pages/sterilizationfree/sterilizationfree",
+            "style" : {}
+        },
+        {
+            "path" : "pages/sterilizationing/sterilizationing",
+            "style" : {}
+        },
+        {
+            "path" : "pages/sterilizationcheck/sterilizationcheck",
+            "style" : {}
+        },
+        {
+            "path" : "pages/sterilizationresult/sterilizationresult",
+            "style" : {}
+        },
+        {
+            "path" : "pages/grounding/grounding",
+            "style" : {}
+        },
+        {
+            "path" : "pages/provide/provide",
+            "style" : {}
+        },
+        {
+            "path" : "pages/providedetail/providedetail",
+            "style" : {}
+        },
+			  {
+		    "path" : "pages/lossregister/lossregister",
+		    "style" : {}
+		},
+      
+        {
+            "path" : "pages/barcodefailure/barcodefailure",
+            "style" : {}
+        },
+		   {
+		    "path" : "pages/accept/accept",
+		    "style" : {}
+		},
+        {
+            "path" : "pages/packread/packread",
+            "style" : {}
+        }
+        ,{
+            "path" : "pages/use/use",
+            "style" : {}
+        }
+        ,{
+            "path" : "pages/outsourcing/outsourcing",
+            "style" : {}
+        }
+        ,{
+            "path" : "pages/revert/revert",
+            "style" : {}
+        },
+		{
+		    "path" : "pages/donotdelete/donotdelete",
+		    "style" : {}
+		}
+    ],
+
+    "globalStyle" : {
+        "navigationBarTextStyle" : "white",
+        "navigationBarBackgroundColor" : "#000000", //设置系统顶部颜色，如时间，电量显示这个头
+        "backgroundColor" : "#fbf9fe",
+        "app-plus" : {
+            "titleNView" : false
+        }
+    }
+}
+// "navigationStyle":"custom"
+

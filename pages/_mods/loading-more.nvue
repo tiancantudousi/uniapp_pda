@@ -1,0 +1,36 @@
+<template>
+	<view class="loading-more-content">
+		<text class="loading-text">{{loadingType === 0 ? contentText.contentdown : (loadingType === 1 ? contentText.contentrefresh : contentText.contentnomore)}}</text>
+	</view>
+</template>
+
+<script>
+	export default {
+			props: {
+			loadingType: {
+				//上拉的状态：0-loading前；1-loading中；2-没有更多了
+				type: Number,
+				default: 0
+			},
+			contentText: {
+				type: Object,
+				default () {
+					return {
+						contentdown: "下拉显示更多",
+						contentrefresh: "正在加载...",
+						contentnomore: "没有更多数据了"
+					};
+				}
+			}
+		},
+	}
+</script>
+
+<style>
+	.loading-more-content{
+			height: 80px;
+			align-items: center;
+			justify-content: center;
+	}
+
+</style>

@@ -1,0 +1,260 @@
+<template>
+	<view style="flex:1" @click="closeSelect">
+		<wxc-loading :show="loading"></wxc-loading>	
+				
+			<view class="flexcenter border-bottom" style="height:200px;width:750px;padding-top:10px;padding-bottom:10px;">	
+				<view  style="flex:1;justify-content: center;align-items: center;">
+					<text class="cencus-font">{{total}}</text>
+					<text style="font-size:30px;">使用数量</text>
+				</view>
+	
+			</view>
+			<view class="flexaround input-row  border-bottom" style="justify-content: center;">
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="startTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('start')" placeholder="日期" />
+            	<image  src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="endTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('end')" placeholder="日期" />
+						<image  src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+			</view>
+			<view class="flexaround input-row border-bottom aligncenter" @click="showSelect('packSelect')">	
+			        <input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="bid"  placeholder="请输入包拼音码" @input="onsearchpack($event.value)"></input>
+					<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="bltmid" placeholder="请录入病历号" return-key-type="search" @return="entertmid"></input>				
+					<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+			</view>
+			<view style="flex:1;">
+				<scroller class="scroller" @loadmore="scrolltoBottom" :loadmoreoffset="20">
+					<view class="list-item border-bottom" style="padding:10px 0 10px 0" @click="showdetail(item)" v-for="(item,index) in censusList" :key="index">
+
+             <image  src="../../static/img/timg.jpg" style="width:110px;height:110px;padding:15px;" alt=""></image>
+						 <view class="flexbetween" style="flex:1;">
+							<text class="more-fontsize" style="word-break: break-all;">{{item.sy_dname}}</text>
+							<text class="same-fontsize">{{item.sy_num}}</text>
+
+
+						 </view>
+             <image  src="../../static/img/i-right.png" style="width:10px;height:20px;margin:0 20px 0 20px;" alt=""></image>
+					
+					</view>
+					<!-- <loadingmore v-if="censusList.length" :loadingType="loadingType"></loadingmore> -->
+				</scroller>
+				
+ 
+			</view>
+			 <scrollerComponent :listshow="packSelect" @chose="onChoosepack"  :width="'450'" :height="'400'" :left="'20'" :top="'370'" :dataList="packlist" :lable="'bmc'"></scrollerComponent> 
+		
+		
+	
+	</view>
+</template>
+
+<script>
+	import scrollerComponent from '../../_mods/scroller.nvue';
+	// import loadingmore from '../../_mods/loading-more.nvue';
+		import { WxcLoading} from 'weex-ui';
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {formatDate} from "../../../common/tool.js";
+	import * as _ from '../../../common/lodash.min.js';
+	import {
+		getUsecensus,searchPacknvue
+	} from "../../../common/api.js";
+	import {
+		myMixin
+	} from "../../../common/mixins.js";
+	import {
+		datewarnmixins
+	} from "../../../common/datewarnmixins.js";
+	
+	export default {
+		mixins: [myMixin,datewarnmixins],
+		components: {scrollerComponent,WxcLoading},
+	
+		data() {
+			return {
+				
+				bltmid:'',
+				bid:'',
+				packId:'',
+				packSelect:false,
+				packlist:[],
+				page:1,
+				pageSize:20,
+				
+				
+				loading:false,
+				
+				
+				startTime:formatDate(new Date(),"yyyy-MM-dd"),
+				endTime:formatDate(new Date(),"yyyy-MM-dd"),
+				total:0,
+				censusList: [],
+				loadingType:2,
+			
+			
+			
+			   chosePack:{},
+	
+				// todaycensusNum:25,
+				
+				
+
+				
+			
+				
+			   
+// 				startDt:'',
+// 				endDt:'',
+				
+				// initTime:formatDate(new Date(),"yyyy-MM-dd"),
+				
+			}
+		},
+		created(){
+// 			console.log(this.todaycensusNum);
+// 			for(var i=0;i<30;i++){
+// 				this.censusList.push(['key',[{'bmc':'cehsisfdasd','hstype_name':'已过期','tmid':'fafasdfasd','qx_num':'fdsfsad'}]])
+// 			}
+	       this.getsystime().then(res=>{
+				this.startTime=res.slice(0,11);
+				this.endTime=res.slice(0,11);
+			})
+			storage.getItem('loginForm', event => {
+			  this.loginForm = JSON.parse(event.data);
+			  setTimeout(()=>{this.getUsecensus();},1);
+		       
+			
+			})
+			storage.getItem('deptlist', event => {
+			  this.deptlist=JSON.parse(event.data);
+			})
+		},
+		methods:{
+			showdetail(item){
+				this.$emit('showdetail',{startTime:this. startTime, endTime:this.endTime})
+			},
+			scrolltoBottom(){
+				this.page++
+				this.getUsecensus();
+			},
+			onsearchpack(e){
+				this.packId='';
+				clearTimeout(this.timer)
+				this.packSelect=true;
+				this.timer=setTimeout(()=>{
+					const data={"Bpzgl":{"py_code":e},"PageReq":{"page":"1","rows":"10"},"LoginForm":this.loginForm};
+					searchPacknvue(data).then(res=>{
+						console.log(res,'搜索包');
+						 if(res.errorCode=="0"){
+							this.packlist=res.returnValue.rows;
+							 // Vue.set(this.washList,itemIndex,res.returnValue.qxjStateList[0]);
+						}
+					})
+				},300)
+				
+			},
+			onChoosepack(item){
+				this.packSelect=false;
+				this.bid=item.bmc;
+				this.packId=item.bid;
+				this.initdata()
+				this.getUsecensus();
+			},
+			entertmid(){
+				this.initdata();
+				this.getUsecensus();
+			},
+			datechange(timestate){
+				if(this.warningdate({'start':this.startTime,'end':this.endTime})){
+					timestate=='end'?modal.toast({message:'结束时间不得小于开始时间！'}):modal.toast({message:'开始时间不得大于结束时间！'});
+					this.initdata();
+					return;
+				}
+				this.initdata()
+				this.getUsecensus();
+			},
+			initdata(){
+				this.page=1;
+				this.censusList=[];
+			},
+			
+			
+			
+			closeSelect(){
+				this.packSelect=false;
+			},
+			showSelect(name) {
+				if (name != "packSelect") {
+					this.deptSelect = false;
+				}
+			
+				setTimeout(() => {
+					this[name] = !this[name];
+				}, 20)
+			
+			},
+			onChooseState(item){
+				this.stateSelect=false;
+				if(this.state==item){
+					return;
+				}
+				this.state=item;
+				// this.hs_type=item.aaa102;
+				this.censusList=[];
+				this.getTocensus();
+			},
+			getUsecensus(){
+				this.loading=true;
+				const data={
+					"Tmxx":{"end_dt_sy":this.endTime.trim(),"isChecked":false,"start_dt_sy":this.startTime.trim(),"sy_did":this.loginForm.deptId,"p_mrn":this.bltmid,"bid":this.packId},"PageReq":{"page":this.page,"rows":this.pageSize},"LoginForm":this.loginForm};
+						console.log('data');
+					console.log(JSON.stringify(data))
+					getUsecensus(data).then(res=>{
+						this.loading=false;
+						console.log('getUsecensus');
+						console.log(JSON.stringify(res))
+						
+							
+							if(res.errorCode == "0"){
+								this.total=res.returnValue.zsl;
+								
+								if(!res.returnValue.rows.length){
+									modal.toast({message: '未查询到相关记录'});
+								}
+								
+
+								
+								let templist=res.returnValue.rows;
+								this.censusList=this.censusList.concat(templist);
+							}
+							
+						
+					}).catch((e)=>{
+					   this.loading=false;
+				    })
+			},
+			
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+<style scoped>
+	.cencus-font{
+		font-size: 80px;
+			color: #FFA613;
+	}
+	.list-item{
+		   padding:0 20px;
+		   flex-direction: row;
+		   align-items: center;
+	}
+	.more-fontsize{
+		  font-size:40px;
+	}
+	.same-fontsize{
+		   font-size:35px;
+	}
+
+</style>

@@ -1,0 +1,83 @@
+<template>
+	<view class="border-bottom" style="padding-left:25px;padding-right:25px;justify-content: space-between;padding-top:10px;padding-bottom:10px;" @click="showitemdetail">	
+		
+		
+
+		<text class="machine-text">{{item.basket_name?item.basket_name:''}}</text>
+
+		
+		<view class="free-item-bottom" style="flex:none;">
+			<text style="width:350px;font-size:38px;">{{item.bmc}}</text>
+			<text class="same-margin base-font-item">包数量:</text>
+			<text class="hight base-font-item">{{item.b_num}}</text>
+			<text class="same-margin base-font-item">器械数量:</text>
+			<text class="hight base-font-item">{{item.qx_num?item.qx_num:0}}</text>
+		</view>
+		
+		
+		
+		
+		
+	</view>
+</template>
+
+<script>
+
+	export default {
+		props: ['item'],
+		components: {
+
+		},
+
+		data() {
+			return {
+
+			}
+		},
+		created(){
+			console.log('fsdfs');
+			console.log(JSON.stringify(this.item));
+			
+		},
+		methods: {
+			showitemdetail(){
+				this.$emit('showitemdetail',this.item)
+			}
+			//            choseitem(){
+			// 			   this.item.checked=!this.item.checked;
+			// 			   this.$emit('choseItem',this.item);
+			// 		   },
+			// 		   showdetail(item){
+			// 			   this.$emit('showdetail',item);
+			// 		   }
+		}
+	}
+</script>
+
+<style scoped>
+	 .border-bottom{
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+	.free-item-bottom {
+		flex-direction: row;
+		align-items: center;
+		color: #A5A5A5;
+	
+	}
+	.same-margin{
+		margin:0 10px 0 10px;
+	}
+	.hight{
+		font-size: 29px;
+		color: #0080FF;
+	}
+	.machine-text {
+			font-size: 42px;
+			color: #333333;
+	}
+	.base-font-item{
+		font-size:33px;
+	}
+	
+</style>

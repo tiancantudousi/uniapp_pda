@@ -1,0 +1,492 @@
+<template>
+	<view class="maincontent">
+		<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+		<view class="home-content" style="position:relative;">
+			<!-- 单独header组件 -->
+			<navhearder @stepClick="" :buttonList="[activeMachine.dev_name]" :loginForm="loginForm"></navhearder>
+
+				
+<!-- 
+			<view class="border-bottom" style="padding-left:25px;padding-right:25px;flex-direction: row;height:120px;align-items: center;">
+       <image src="../../static/img/timg.jpg" style="flex:none;width:110px;height:110px;" alt=""></image>
+				 <view style="flex:1;background-color: black;">
+					 <view  style="background-color: red;flex-direction: row;">
+						<text style="font-size:35px;flex:1;">
+							{{activeMachine.dev_name}}
+						</text>
+						<text style="font-size:35px;">
+							{{activeMachine.d_gc}}/{{activeMachine.t_gc}}
+						</text>
+					</view>
+					<text style="font-size:34px;background-color: green;">
+						  {{activeMachine.start_dt}}-{{endDt}}
+					</text>
+				 </view>
+			</view> -->
+			<view style="width:750px;padding:10px;" class="top-list-item border-bottom" @click="itemclick">
+			
+				 <image src="../../static/img/timg.jpg" style="flex:none;width:110px;height:110px;"  alt=""></image>
+				 <view class="top-item-content" style="padding-left:10px;">
+					 <view style="flex-direction: row;align-items: center;justify-content: space-between;">
+						  <view style="flex:1;">
+						 		<text style="font-size:35px;">{{activeMachine.dev_name}}</text>
+						 </view>
+						 <view style="flex:none;">
+						 		<text style="font-size:35px;">{{activeMachine.d_gc}}/{{activeMachine.t_gc}}</text>
+						 </view>
+					 </view>
+					  
+					 <view class="wrap">
+					 	<text style="font-size:34px;">{{activeMachine.start_dt}}-{{endDt}}</text>
+					 </view>
+				
+				 </view>
+				 
+			</view>
+			
+			<view class="input-row border-bottom" style="flex-direction: row;align-items: center;">
+				<text style="font-size:32px">温度(℃):</text>
+				<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="tempreture" placeholder=""></input>
+			</view>
+			<view class="input-row border-bottom" style="flex-direction: row;align-items: center;">
+				<text style="font-size:32px">压力(kPa):</text>
+				<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="kpa" placeholder=""></input>
+			</view>
+			<view class="input-row border-bottom" style="flex-direction: row;align-items: center;">
+				<text style="font-size:32px">持续时间(分):</text>
+				<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="munite" placeholder=""></input>
+			</view>
+			<view v-if="activeMachine.type!='1'">	
+				<view class="input-row border-bottom" style="flex-direction: row;align-items: center;">
+					<view style="flex:1;">
+						<text style="font-size:32px">物理检测</text>
+					</view>
+					
+					<view  style="height:90px;width:240px;flex-direction: row;justify-content: space-between;align-items: center;">
+						<wxc-button text="合格" :type="ifwlstandard?'green':'white'" :btn-style="{width:'100px',height:'70px'}" :text-style="{fontSize:'30px',color:ifwlstandard?'white':'black'}" @wxcButtonClicked="wlstandard"></wxc-button>
+						<wxc-button text="不合格" :type="ifwlstandard?'white':'red'" :btn-style="{width:'130px',height:'70px'}" :text-style="{fontSize:'30px',color:ifwlstandard?'black':'white'}" @wxcButtonClicked="wlunstandard"></wxc-button>
+					</view>
+				</view>
+				<view class="input-row border-bottom" style="flex-direction: row;align-items: center;">
+					<view style="flex:1;">
+						<text style="font-size:32px">化学检测</text>
+					</view>
+					
+					<view  style="height:90px;width:240px;flex-direction: row;justify-content: space-between;align-items: center;">
+						<wxc-button text="合格" :type="ifhxstandard?'green':'white'" :btn-style="{width:'100px',height:'70px'}" :text-style="{fontSize:'30px',color:ifhxstandard?'white':'black'}" @wxcButtonClicked="hxstandard"></wxc-button>
+						<wxc-button text="不合格" :type="ifhxstandard?'white':'red'" :btn-style="{width:'130px',height:'70px'}" :text-style="{fontSize:'30px',color:ifhxstandard?'black':'white'}" @wxcButtonClicked="hxunstandard"></wxc-button>
+					</view>
+				</view>
+				<view class="input-row border-bottom" style="flex-direction: row;align-items: center;">
+					<view style="flex:1;">
+						<text style="font-size:32px">生物检测</text>
+					</view>
+					
+					<view  style="height:90px;width:240px;flex-direction: row;justify-content: space-between;align-items: center;">
+						<wxc-button text="合格" :type="ifswstandard?'green':'white'" :btn-style="{width:'100px',height:'70px'}" :text-style="{fontSize:'30px',color:ifswstandard?'white':'black'}" @wxcButtonClicked="swstandard"></wxc-button>
+						<wxc-button text="不合格" :type="ifswunstandard?'red':'white'" :btn-style="{width:'130px',height:'70px'}" :text-style="{fontSize:'30px',color:ifswunstandard?'white':'black'}" @wxcButtonClicked="swunstandard"></wxc-button>
+					</view>
+				</view>
+			</view>
+
+			<view class="bottom-button" v-if="activeMachine.type=='1'">
+				<view class="flexcenter" style="flex:1;background-color: #FA6865;">
+					<text class="same-button-left"  @click.stop="bdcheck(false)">不合格</text>
+				</view>
+				<view class="flexcenter" style="flex:1;background-color: #0080FF;">
+					<text class="same-button-right" style="flex:1;" @click.stop="bdcheck(true)">合格</text>
+				</view>
+				
+				
+			</view>
+		
+			
+			<view class="one-button flexcenter" v-if="activeMachine.type!='1'" style="position:absolute;bottom:0;left:0;width:750px;" @click="surecheck">
+			   
+				<text class="same-button">确认</text>
+			</view>
+			<wxc-dialog :title="''"
+			    :content="'是否换锅？'"
+			    :show="showDialog"
+				 @wxcDialogCancelBtnClicked="docheck" 
+			    @wxcDialogConfirmBtnClicked="surechangepan"
+			  ></wxc-dialog>
+		
+
+
+		<!-- 	<scroller class="scroller" style="flex:1;width:750px;">
+				<scrollListItem v-if="selfdetailList.length" v-for="(item,index) in selfdetailList" :key="index" :item="item"></scrollListItem>
+			</scroller>
+			<view class="bottom-button">
+				<text class="same-button-left" style="flex:1;border-style: solid;border-right-width: 2px;border-color: white;"
+				 @click.stop="onUnquality">不合格</text>
+				<text class="same-button-right" style="flex:1;" @click.stop="onquality">合格</text>
+			</view> -->
+			 
+		<!-- 	<potchange v-if="showpotChange" @onClosetemp="showpotChange=false" :washstate="'prepare'"></potchange> -->
+	     	<unqualityreson v-if="showunqualityReson"  :machines="machines" :unqualityResons="unqualityResons" @closeUnqualityReson="onCloseUnqualityReson"></unqualityreson>
+		</view>
+
+		<wxc-loading :show="loading"></wxc-loading>
+
+	</view>
+</template>
+
+
+<script>
+	let timer;
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {
+		WxcLoading,
+		WxcDialog,
+		WxcButton
+	} from 'weex-ui';
+	import Navhearder from '../_mods/navhearder.nvue';
+	// import loadingmore from '../_mods/loading-more.nvue';
+	import scrollListItem from '../_mods/wash-scroll-item.nvue';
+	import unqualityreson from './components/unquality-reson.nvue';
+	// import potchange from '../wash/components/potchange.nvue';
+// 	import {
+// 		formatDate
+// 	} from "../../common/tool.js";
+
+	// import reclaimDetail from "../reclaim/components/reclaim-detail.nvue";
+
+
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	import * as _ from '../../common/lodash.min.js';
+	import {
+		getsterilizationList,publicSelect,sterilizationcheck,sterilizationchangepan
+
+	} from "../../common/api.js";
+
+
+
+	export default {
+		mixins: [myMixin],
+		components: {
+			Navhearder,
+			WxcLoading,
+			scrollListItem,
+			WxcButton,
+			unqualityreson,
+			WxcDialog
+			// scrollerComponent,
+			// potchange
+		},
+		data() {
+			return {
+				endDt: '',
+				activeMachine: {},
+				loading: false,
+				
+				loginForm: {},
+				tempreture:'',
+				 kpa:'',
+				  munite:'',
+				  machines:[],
+				  unqualityResons:[],
+				  showunqualityReson:false,
+				  ifswstandard:false,
+				  ifswunstandard:false,
+				  ifwlstandard:true,
+				  ifhxstandard:true,
+				  unqualitydata:'',
+				  showDialog:false,
+				  
+				  
+				  
+				  
+				
+				
+				
+				packNum: 0,
+				materialNum: 0,
+                loading:false,
+				
+				
+
+			}
+		},
+
+		created() {
+			this.setbarheight();
+		
+			
+			storage.getItem('activeSterililzationmachine', event => {
+			
+				this.activeMachine = JSON.parse(event.data);
+				console.log('activeSterililzationmachine');
+				console.log(JSON.stringify(this.activeMachine));
+				this.endDt = this.activeMachine.end_dt.slice().substring(11, this.activeMachine.end_dt.length);
+				
+				
+			})
+		
+
+			storage.getItem('loginForm', event => {
+				this.loginForm = JSON.parse(event.data);
+				this.sterunstandardreson();
+				this.getsterilizationList();
+			})
+			// this.refreshpage.bind(this);
+		},
+
+		methods: {
+			bdcheck(state){
+			
+					    let data={
+						"Mj":{
+							"did":this.loginForm.deptId,
+							"temp":this.tempreture,
+							"pres":this.kpa,
+							"jgms":this.activeMachine.jgms,
+							"type":this.activeMachine.type,
+							"plan_time_name":this.activeMachine.plan_time_name,
+							"sb_type":this.activeMachine.sb_type,
+							"state":this.activeMachine.state,
+							"state_name":this.activeMachine.state_name,
+							"cre_uid":this.loginForm.userId,
+							"cre_uname":this.loginForm.userName,
+							"d_gc":this.activeMachine.d_gc,
+							"dev_id":this.activeMachine.dev_id,
+							"dev_name":this.activeMachine.dev_name,
+							"end_dt":this.activeMachine.end_dt,
+							"id":this.activeMachine.id,
+							"plan_time":this.activeMachine.plan_time,
+							"start_dt":this.activeMachine.start_dt,
+							"result":state?'1':0,
+							"time":this.munite,
+							"t_gc":this.activeMachine.t_gc},"LoginForm":this.loginForm
+					}
+					this.loading=true;
+					sterilizationcheck(data).then(res=>{
+						this.loading=false;
+						if(res.status=="OK"){
+						   modal.toast({message:"检定成功"});
+						   this.refreshpage();
+						}
+						if(res.status=="error"){
+						  modal.toast({message:res.message});
+						}
+					})
+				
+			},
+			docheck(){
+				this.showDialog=false;
+				let data=this.checkdata();
+				 console.log('docheck');
+				 console.log(JSON.stringify(data));
+				this.loading=true;
+				sterilizationcheck(data).then(res=>{
+					this.loading=false;
+					if(res.status=="OK"){
+					   modal.toast({message:"检定成功"});
+					   this.refreshpage();
+					}
+					if(res.status=="error"){
+					  modal.toast({message:res.message});
+					}
+				})
+			},
+			surecheck(){
+			   if((!this.ifwlstandard||!this.ifhxstandard||!this.ifswstandard)&&this.unqualitydata.dev_id){//换锅
+				   this.showDialog=true;
+				   return;
+			   }
+				this.docheck();
+			},
+			async surechangepan(){//换锅
+				 this.showDialog=false;
+				 let data=this.checkdata();
+				 console.log('surechangepan');
+				  console.log(JSON.stringify(data));
+				let res=await sterilizationcheck(data);
+				 this.changepan(data);
+				
+			},
+			changepan(data){
+				Object.assign(data.Mj,{},{
+					"aft_d_gc":this.unqualitydata.d_gc,
+					"aft_dev_id":this.unqualitydata.dev_id,
+					"aft_dev_name":this.unqualitydata.dev_name,
+					"aft_t_gc":this.unqualitydata.t_gc});
+				
+				sterilizationchangepan(data).then(res=>{
+			
+					if(res.status=="OK"){
+					   modal.toast({message:"换锅成功"});
+					   this.refreshpage(this.unqualitydata);
+					
+					}
+					if(res.status=="error"){
+					  modal.toast({message: res.message});
+					 }
+				})
+			},
+			checkdata(){
+			    let data={
+					"Mj":{
+						"did":this.loginForm.deptId,
+						"temp":this.tempreture,
+						"pres":this.kpa,
+						"jgms":this.activeMachine.jgms,
+						"type":this.activeMachine.type,
+						"plan_time_name":this.activeMachine.plan_time_name,
+						"sb_type":this.activeMachine.sb_type,
+						"state":this.activeMachine.state,
+						"state_name":this.activeMachine.state_name,
+						"cre_uid":this.loginForm.userId,
+						"cre_uname":this.loginForm.userName,
+						"d_gc":this.activeMachine.d_gc,
+						"dev_id":this.activeMachine.dev_id,
+						"dev_name":this.activeMachine.dev_name,
+						"end_dt":this.activeMachine.end_dt,
+						"id":this.activeMachine.id,
+						"hx_result":this.ifhxstandard?'1':'0',
+						"plan_time":this.activeMachine.plan_time,
+						"start_dt":this.activeMachine.start_dt,
+						"time":this.munite,
+						"t_gc":this.activeMachine.t_gc,
+						"sw_result":this.ifswstandard?'1':this.ifswunstandard?'0':'',
+						"wl_result":this.ifwlstandard?'1':'0'},"LoginForm":this.loginForm
+				}
+				console.log('basedata')
+				 console.log(JSON.stringify(data));
+				if(this.ifhxstandard&&this.ifwlstandard&&!this.ifswunstandard){//合格
+				    return data;
+				}
+				else{//不合格
+				    Object.assign(data,{},{result:'0',"bhgyy_id":this.unqualitydata.aaa102?this.unqualitydata.aaa102:'',"bhgyy_name":this.unqualitydata.aaa103?this.unqualitydata.aaa103:''});
+					return data;
+				}
+				
+				
+				
+			},
+			swstandard(){
+				this.ifswstandard=!this.ifswstandard;
+				this.ifswunstandard=false;
+			},
+			swunstandard(){
+				this.ifswunstandard=!this.ifswunstandard;
+				this.ifswstandard=false;
+				this.showunqualityReson=true;
+			},
+			hxstandard(){
+				this.ifhxstandard=true;
+			},
+			hxunstandard(){
+				this.ifhxstandard=false;
+				this.showunqualityReson=true;
+			},
+			wlunstandard(){
+				this.ifwlstandard=false;
+				this.showunqualityReson=true;
+			},
+			getsterilizationList(){//获取多个灭菌机
+				const data={"Sbxx":{"did":this.loginForm.deptId,"is_inv":"1","sb_type":"3~4~5"},"LoginForm":this.loginForm};
+				getsterilizationList(data).then(res=>{
+				    if(res.errorCode=="0"){
+					   this.machines=res.returnValue.SbxxList.filter(item=>{
+						   return item.id!=this.activeMachine.dev_id;
+					   });
+					}
+				})
+			},
+
+			 refreshpage(item){
+				storage.getItem('sterilizationchechjumpPage', event => {
+				     if(event.data=="sterilizationresult"){ 
+				     	  uni.postMessage({key: "freshsterilizationresult",value:''});
+				     }else{
+						  uni.postMessage({key: "sterilizationmachine",value:this.activeMachine});
+				
+						 if(item){
+							  uni.postMessage({key: "sterilizationmachine",value:item});
+						 }
+				     }
+					    uni.navigateBack({delta: 1}); 
+				})
+			
+				
+			},
+			sterunstandardreson(){
+				const data={"AA10":{"aaa100":"MJ_BHGYY"},"LoginForm":this.loginForm};
+				publicSelect(data).then(res=>{
+					
+				  if(res.errorCode=="0"){
+					  this.unqualityResons=res.returnValue.AA10List;
+				  }
+				  if(res.status=="error"){
+					  modal.toast({message: res.message});
+				  }
+				})
+			},
+			onCloseUnqualityReson(e){
+				this.showunqualityReson=false;
+				if(e){
+					this.unqualitydata=e;
+				}
+			},
+            wlstandard(){
+             	this.ifwlstandard=true;
+             },
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style scoped>
+
+	  .top-list-item{
+		   padding:0 20px;
+		   flex-direction: row;
+		   align-items: center;
+	}
+	 .top-item-content{
+		    padding-right:20px;
+		   flex:1;
+	}
+		.same-button{
+		   font-size:45px;
+		  /* text-align: center; */
+		   color:white;
+		/*   height:90px;
+		   line-height:90px; */
+		  
+	}
+		.same-button-right {
+		font-size: 45px;
+		text-align: center;
+		color: white;
+		height: 90px;
+		line-height: 90px;
+		
+	}
+	.same-button-left {
+		font-size: 45px;
+		text-align: center;
+		color: white;
+		height: 90px;
+		line-height: 90px;
+		
+	}
+		.bottom-button {
+		width: 750px;
+		height: 90px;
+		flex-direction: row;
+	}
+	.one-button{
+		
+		   background-color: #0080FF;
+		  flex:none;
+		   width:750px;
+		   height:90px;
+		   align-items: center;
+		   justify-content: center;
+		 /*  flex-direction: row; */
+	}
+</style>

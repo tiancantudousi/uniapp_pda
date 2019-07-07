@@ -1,0 +1,236 @@
+<template>
+	<view class="maincontent">
+		<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+		<view class="home-content" style="position:relative;">
+			<!-- 单独header组件 -->
+			<navhearder @stepClick="" :buttonList="[item.deptname]" :loginForm="loginForm"></navhearder>
+		    <view class="input-row border-bottom" style="flex-direction: row;align-items: center;border-color: #E5E5E5;border-top-width:2px;">
+		    	<text style="font-size:40px;margin-left:30px;margin-right:30px;">{{item.sl_dt}}</text>
+		    	<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="tmid" return-key-type="search"  placeholder="请录入包条码" @return="providepass()"></input>
+		    </view>
+
+
+			<scroller class="scroller" style="flex:1;width:750px;">
+				<view style="width:750px;"  v-for="(itemin,index) in provideList" :key="index">
+					<view class="border-bottom" style="width:750px;padding:10px;flex-direction: row;align-items: center;" >
+						 <image src="../../static/img/timg.jpg" class="timg-image"  alt=""></image>
+						 <view style="flex:1;">
+							 <view style="flex-direction: row;align-items: center;">
+								 <text class="more-fontsize" style="flex:1;">{{itemin.bmc}}</text> 
+							 </view>
+							  <view style="flex-direction: row;align-items: center;flex:1;"> 
+								    <text class="same-fontsize">申领:</text>
+									<view style="margin:10px;"></view>
+									<text style="color:#0080FF;font-size:35px;">{{itemin.b_num}}件</text>
+									<view style="margin:20px;"></view>
+									 <text class="same-fontsize">已发: </text>
+									 <view style="margin:10px;"></view>
+									<text style="color:#0080FF;font-size:35px;">{{itemin.ff_num}}件</text>
+						      </view>
+						 </view>
+					</view>
+					
+					<view class="flexbetween border-bottom" style="padding:10px;" v-for="(element,index) in itemin.tmidlist" :key="index" >
+							   <text class="same-fontsize" style="flex:1;text-align: center;">{{element.tmid}}</text>
+							   <text class="same-fontsize" style="flex:1;text-align: center;">{{element.ff_dt}}</text>
+					</view>
+				</view>
+			
+					
+			</scroller>
+
+		</view>
+		<wxc-dialog :title="'包条码：'+tmid"
+			:content="'已发放,是否撤销?'"
+			:show="showDialog"
+			@wxcDialogCancelBtnClicked="showDialog=false"
+			@wxcDialogConfirmBtnClicked="cancleff"
+		  ></wxc-dialog>
+		<wxc-loading :show="loading"></wxc-loading>
+
+	</view>
+</template>
+
+
+<script>
+	
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {
+		WxcLoading,
+		WxcDialog
+	} from 'weex-ui';
+	import Navhearder from '../_mods/navhearder.nvue';
+	// import loadingmore from '../_mods/loading-more.nvue';
+	
+
+
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	import * as _ from '../../common/lodash.min.js';
+	import {
+
+		providepass,getprovideDetail,cancleff
+	} from "../../common/api.js";
+
+
+
+	export default {
+		mixins: [myMixin],
+		components: {
+			Navhearder,
+			WxcLoading,
+			WxcDialog
+			
+		},
+		data() {
+			return {
+				item:'',
+				loading: false,
+				loginForm: {},
+				tmid:'',
+				showDialog:false,
+				providedept:'',
+				provideList:[]
+			
+			}
+		},
+
+		created() {
+			this.setbarheight();
+           
+			this.linsentBarCode(this.judgeScanType)
+
+			storage.getItem('providedept', event => {
+				this.item = JSON.parse(event.data);
+				this.getprovideDetail();
+			})
+	
+			
+			storage.getItem('loginForm', event => {
+				this.loginForm = JSON.parse(event.data); 
+			    
+			})
+		},
+  
+		methods: {
+			addlist(result,state){
+				let item= {ff_dt:result.ff_dt.substring(11,result.ff_dt.length),bid:result.bid,tmid:this.tmid};
+				let additem=this.provideList.find(element=>{
+					return element.bid==item.bid;
+				})
+				if(state=='push'){
+					additem.tmidlist.push(item);
+				}else{
+					console.log(additem.tmidlist,this.tmid);
+					additem.tmidlist=additem.tmidlist.filter((element)=>{
+						return element.tmid!=this.tmid;
+					})
+				}
+				this.tmid='';
+				
+			},
+			getprovideDetail(fun,listdata,state){
+				
+				const data={"SlDtl":{
+					"sl_id":this.item.sl_id,
+					"did":this.item.did,
+					"end_dt":this.item.endTime.trim()+" 23:59:59",
+					"ffList":[],
+					"hb_num":this.item.hb_num,
+					"jb_num":this.item.jb_num,
+					"jsb_num":this.item.jsb_num,
+					"start_dt":this.item.startTime.trim()+" 00:00:00"},"LoginForm":this.loginForm};
+				getprovideDetail(data).then(res=>{
+					console.log(res,'getprovideDetail');
+					if(res.status=="OK"){
+						// res.returnValue.FfList.tmidlist=[];
+						this.provideList=res.returnValue.FfList.map(item=>{
+							return Object.assign(item,{tmidlist:[]})
+						});
+						if(fun){
+							fun(listdata,state);
+						}
+					}else{
+						modal.toast({message:res.message})
+					}
+				})
+			},
+			cancleff(){
+				this.showDialog=false;
+				const data={"FfLog":{"tmid":this.tmid},"LoginForm":this.loginForm};
+							
+				cancleff(data).then(res=>{
+					
+				
+					if(res.status=="OK"){
+						modal.toast({message:'撤销成功'})
+						this.getprovideDetail(this.addlist,res.returnValue.Tmxx,'cancle');
+						
+					}
+					
+					if(res.status=='error'){
+						modal.toast({message:res.message})
+					}
+					
+				})
+			},
+            providepass(){
+            	if(this.tmid.trim()==''){
+            		modal.toast({message:'请录入条码'})
+            		return;
+            	}
+            	const data={"FfLog":{"sl_id":this.item.sl_id,"dept_did":this.item.did,"tmid":this.tmid},"LoginForm":this.loginForm};
+            
+            	providepass(data).then(res=>{
+            		
+            		if(res.status=="OK"){
+            			modal.toast({message:'操作成功'})
+            			this.getprovideDetail(this.addlist,res.returnValue.Tmxx,'push');
+            			
+            		}
+            		if(res.status=="warn"){
+            			this.showDialog=true;
+            		}
+            		if(res.status=='error'){
+            			modal.toast({message:res.message})
+            		}
+            		
+            	})
+            },
+			
+				/*清洗enter事件功能区域*/
+			judgeScanType(data){
+				let reg=new RegExp('^(BB|bb)');
+				if(reg.test(data)){//包扫码
+					let bid = data.slice(2,data.length);
+					this.onChoosepack({bid:bid});
+				}		
+			},
+		
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style scoped>
+	
+	   .timg-image{
+		 width:150px;
+		 height:150px;
+		 padding:15px;
+		 flex:none;
+	}
+	.item-content{
+		   
+		   flex:1;
+	}
+	.same-fontsize{
+		font-size: 35px;
+	} 
+	.more-fontsize{
+		font-size: 40px;
+	}
+	
+	
+</style>

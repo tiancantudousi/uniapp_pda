@@ -1,0 +1,423 @@
+<template>
+
+			<view style="flex:1;width:750px;" @click="closeSelect">
+
+				<view class="flexaround input-row border-bottom">
+					<view class="flexaround paddingimage" @click="showSelect('buildSelect')" style="flex:1;align-items: center;">
+						<text style="flex:none;font-size:35px;">大楼:</text>
+						<text style="flex:1;height:60px;line-height:60px;font-size:35px;">{{build.dlname?build.dlname:'请选择大楼'}}</text>
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexaround paddingimage" @click="showSelect('floorSelect')" style="flex:1;align-items: center;">
+						<text style="flex:none;font-size:35px;">楼层:</text>
+						<text style="flex:1;height:60px;line-height:60px;font-size:35px;">{{floorName?floorName:'请选择楼层'}}</text>
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+				</view>
+				<view class="flexaround input-row border-bottom">
+					<view class="flexaround paddingimage" @click="showSelect('deptSelect')" style="flex:1;align-items: center;">
+						<text style="flex:none;font-size:35px;">科室:</text>
+						<input style="height:60px;flex:1;" type="text" @focus="showSelect('deptSelect')" v-model="dept" placeholder="请选择科室" @input="onsearchdept($event)"></input>
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexaround" style="flex:1;align-items: center;">
+					   <input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="tmid" return-key-type="search"  placeholder="请录入包条码" @return="directprovide()"></input>
+					</view>
+				</view>
+
+				<view class="main-list">
+					<scroller class="scroller">
+					     <listItemComponents v-for="(item,index) in provideList" :key="index" :itemin="item"></listItemComponents>
+						<loadingmore v-if="provideList.length" :loadingType="'2'"></loadingmore>
+					</scroller>
+
+				</view>
+
+			
+				<scrollerComponent :showpleaseSlect="true" :listshow="buildSelect" @chose="onChoosebuild" :width="'380'" :height="'300'"
+				 :left="'20'" :top="'80'" :dataList="builds" :lable="'dlname'"></scrollerComponent>
+				<scrollerComponent :showpleaseSlect="true" :listshow="floorSelect" @chose="onChoosefloor" :width="'380'" :height="'300'"
+				 :left="'360'" :top="'80'" :dataList="floors" :lable="'lcname'"></scrollerComponent>
+				<scrollerComponent :showpleaseSlect="true" :listshow="deptSelect" @chose="onChoosedept" :width="'420'" :height="'350'"
+				 :left="'20'" :top="'170'" :dataList="kslist" :lable="'de_deptname'"></scrollerComponent>
+			
+                	<wxc-dialog :title="'包条码：'+tmid"
+                	:content="'已发放,是否撤销?'"
+                	:show="showDialog"
+                	@wxcDialogCancelBtnClicked="showDialog=false"
+                	@wxcDialogConfirmBtnClicked="cancleff"
+                  ></wxc-dialog>
+
+				<wxc-loading :show="loading"></wxc-loading>
+				
+
+	</view>
+</template>
+
+
+<script>
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage')
+	import {
+		WxcButton,
+		WxcLoading,
+		WxcDialog
+	} from 'weex-ui';
+	import Navhearder from '../../_mods/navhearder.nvue';
+	import loadingmore from '../../_mods/loading-more.nvue';
+	import scrollerComponent from '../../_mods/scroller.nvue';
+	import listItemComponents from './list-item.nvue';
+// 	import cencusComponent from './components/cencus.nvue';
+// 	import reclaimItem from "./components/reclaim-list-item.nvue";
+// 
+// 	import reclaimDetail from "./components/reclaim-detail.nvue";
+	import {
+		myMixin
+	} from "../../../common/mixins.js";
+	import {
+		datewarnmixins
+	} from "../../../common/datewarnmixins.js";
+	import * as _ from '../../../common/lodash.min.js';
+	import {
+		getbuilds,
+		getfloors,
+		getdeptbyfloor,
+	    directprovide,
+		getdirectprovideList,
+		cancleff
+	} from "../../../common/api.js";
+
+
+
+	export default {
+		mixins: [myMixin,datewarnmixins],
+		components: {
+			Navhearder,
+			WxcButton,
+			scrollerComponent,
+			WxcLoading,
+			loadingmore,
+			WxcDialog,
+			listItemComponents
+
+		},
+		data() {
+			return {
+				tmid:'',
+				loading: false,
+				page: 1,
+				pageSize: 20,
+				loginForm: {},
+				loadingType: 0,
+				build: {},
+				floorName: '',
+				floorlcbh: '',
+				floorSelect: false,
+				deptSelect: false,
+				buildSelect: false,
+				builds: [],
+				floors: [],
+				deptlist: [],
+				dept:'',
+				kslist: [],
+				deptId: '',
+				showDialog:false,
+				provideList:[]
+
+
+
+
+			}
+		},
+
+		created() {
+			this.setbarheight();
+			this.getsystime().then(res=>{
+				storage.getItem('loginForm', event => {
+				  this.loginForm = JSON.parse(event.data);
+				  this.getbuilds();
+				
+				
+				})
+			})
+			storage.getItem('deptlist', event => {
+				this.deptlist = JSON.parse(event.data);
+				this.searchList('');
+			})
+		},
+
+		methods: {
+			cancleff() {
+				this.showDialog = false;
+				const data = {
+					"FfLog": {
+						"tmid": this.tmid
+					},
+					"LoginForm": this.loginForm
+				};
+			
+				cancleff(data).then(res => {
+			
+					console.log(res, '撤销条码');
+					if (res.status == "OK") {
+						modal.toast({message: '撤销成功'});
+						this.getdirectprovideList();
+						// this.addlist(res.returnValue.Tmxx,'cancle');
+						this.tmid = '';
+					}
+			
+					if (res.status == 'error') {
+						modal.toast({message: res.message});
+					}
+			
+				})
+			},
+			buildList(list){
+				let bmcnames=list.map((item)=>{
+					return item.bmc;
+				});
+			
+				let unquname=_.uniq(bmcnames);
+				
+			
+				
+				unquname.forEach(item=>{
+					let templist=list.filter((element)=>{
+						return item==element.bmc;
+					})
+					let tmlist=templist.map(element=>{
+						return {tmid:element.tmid,ff_dt:element.ff_dt}
+					})
+					this.provideList.push({bmc:item,ff_num:templist.length,tmidlist:tmlist});
+				})
+			 
+			},
+	        getdirectprovideList() {
+	        	this.provideList = [];
+	        	const data = {
+	        		"Tmxx": {
+	        			"bnrList": [],
+	        			"isChecked": false,
+	        			"jsList": [],
+	        			"zjFfList": [],
+	        			"ff_did": this.deptId
+	        		},
+	        		"PageReq": {},
+	        		"LoginForm": this.loginForm
+	        	};
+	        	getdirectprovideList(data).then(res => {
+	        		console.log(res, '直接申领单列表');
+	        		if (res.status == "OK") {
+	        			let tmeplist = res.returnValue.rows.map(item=>{
+	        				return {bid:item.bid,bmc:item.bmc,tmid:item.tmid,ff_dt:item.ff_dt.substring(11,item.ff_dt.length)}
+	        			});
+	        			this.buildList(tmeplist);
+	        		} else {
+	        			modal.toast({message: res.message});
+	        		}
+	        	})
+	        },
+		    directprovide() {
+		    	if (!this.deptId) {
+		    		modal.toast({message: '请选择科室'});
+		    		return;
+		    	}
+		    	if(this.tmid==''){
+		    		modal.toast({message: '请录入包条码'});
+		    		return;
+		    	}
+		    	const data = {
+		    		"FfLog": {
+		    			"dept_did": this.deptId,
+		    			"tmid": this.tmid
+		    		},
+		    		"LoginForm": this.loginForm
+		    	};
+		    	directprovide(data).then(res => {
+		    		console.log(res, '直接发放');
+		    		if (res.status == "OK") {
+		    			modal.toast({message: '发放成功'});
+		    			this.getdirectprovideList();
+		    		}
+		    		if (res.status == "warn") {
+		    			this.showDialog = true;
+		    
+		    		}
+		    		if (res.status == 'error') {
+		    			modal.toast({message: res.message});
+		    		}
+		    	})
+		    },
+			onChoosedept(item) {
+				this.deptSelect = false;
+				if (this.deptId == item.de_deptid) {
+					return;
+				}
+				this.toReclaimList = [];
+				this.dept = item.de_deptname;
+				this.deptId = item.de_deptid;
+
+				this.getdirectprovideList();
+			},
+			getdeptbyfloor() {
+
+				const data = {
+					"Kslcgx": {
+						"dlbh": this.build ? this.build.dlbh : '',
+						"lcbh": this.floorlcbh
+					},
+					"LoginForm": this.loginForm
+				}
+				console.log(data);
+				getdeptbyfloor(data).then(res => {
+					console.log(JSON.stringify(res));
+					this.deptlist = res.returnValue.ksxxList.map(item => {
+						return {
+							de_deptname: item.deptname,
+							de_deptid: item.deptid,
+							alph: item.alph
+						};
+					});
+					this.searchList(''); //默认取前15个
+				})
+			},
+			onsearchdept(e) {
+				this.deptSelect = true;
+				this.searchList(e.value);
+			},
+			searchList(e) {
+				console.log(e);
+
+				this.searchDeptsthrottle(e, this.deptlist).then(res => {
+					console.log(JSON.stringify(res));
+					this.kslist = res;
+				}).catch((e) => {
+					console.log(e);
+				})
+			},
+			getfloors() {
+				this.floors = [];
+				const data = {
+					"Lcxx": {
+						"dlbh": this.build.dlbh
+					},
+					"LoginForm": this.loginForm
+				};
+				getfloors(data).then(res => {
+
+					this.floors = res.returnValue.lcxxList.map(item => {
+						return {
+							lcname: item.lcname,
+							lcbh: item.lcbh
+						}
+					});
+					console.log(res, 'floors');
+				})
+			},
+			getbuilds() {
+				const data = {
+					"Dlxx": {},
+					"LoginForm": this.loginForm
+				};
+				getbuilds(data).then(res => {
+					if (res.status == "OK" && res.returnValue) {
+						this.builds = res.returnValue.dlxxList.map(item => {
+							return {
+								dlname: item.dlname,
+								dlbh: item.dlbh
+							};
+						});
+					} else {
+						modal.toast({
+							message: '楼层获取失败'
+						});
+					}
+				})
+			},
+			onChoosefloor(item) {
+				this.floorSelect = false;
+				if (this.floorlcbh == item.lcbh) {
+					return;
+				}
+				this.dept = '';
+				this.floorName = item.lcname;
+				this.floorlcbh = item.lcbh;
+				this.getdeptbyfloor();
+				console.log(item);
+			},
+			onChoosebuild(item) {
+				this.buildSelect = false;
+				if (this.build == item) {
+					return;
+				}
+
+				this.build = item;
+				this.floorName = '请选择';
+				this.floorlcbh = '';
+
+
+
+				this.dept = '';
+				if (item.dlbh) {
+					this.getdeptbyfloor();
+					this.getfloors();
+				} else {
+					storage.getItem('deptlist', event => {
+						//设置默认科室列表为登录页科室列表
+						this.deptlist = JSON.parse(event.data);
+						this.searchList('');
+					})
+					this.floors = [];
+
+				}
+			},
+			closeSelect() {
+				this.deptSelect = false;
+				this.floorSelect = false;
+				this.buildSelect = false;
+			},
+			showSelect(name) {
+				if (name != "floorSelect") {
+					this.floorSelect = false;
+				}
+				if (name != "deptSelect") {
+					this.deptSelect = false;
+				}
+				if (name != "buildSelect") {
+					this.buildSelect = false;
+				}
+				setTimeout(() => {
+					this[name] = !this[name];
+				}, 20)
+
+			},
+// 			resetparmas() {
+// 				this.page = 1;
+// 				this.accontNum = 0;
+// 				this.toReclaimList = [];
+// 			},
+
+			stepClick(index) {
+				this.activeIndex = -1;
+				setTimeout(() => {
+					this.activeIndex = index;
+				}, 1)
+			},
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+<style scoped>
+	.activewhite{
+		color:white;
+	}
+	.bottom-button {
+		width: 750px;
+		height: 90px;
+		flex-direction: row;
+	}
+		.activejj{
+		background-color: #F5A623;
+		color:white;
+	}
+</style>

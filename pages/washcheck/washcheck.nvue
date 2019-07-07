@@ -1,0 +1,422 @@
+<template>
+	<view class="maincontent">
+		<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+		<view class="home-content" style="position:relative;">
+			<!-- 单独header组件 -->
+			<navhearder @stepClick="" :buttonList="[activeMachine.dev_name]" :loginForm="loginForm"></navhearder>
+
+				
+			<view class="input-row  border-bottom" style="align-items: center;flex-direction: row;">
+				<text class="left-first">{{start}}</text>
+				<text class="left-last" style="margin-left:20px;">{{activeMachine.proc_name}} &nbsp;&nbsp;{{activeMachine.plan_time}}分</text>
+			</view>
+	
+			<view class="split"></view>
+			<view class="input-row  border-bottom" style="align-items: center;flex-direction: row;">
+				<view style="flex-direction: row;">
+					<text style="font-size:35px;">包数量:</text>
+					<text style="color:#0080FF;font-size:35px;">{{packNum}}</text>
+				</view>
+				<view style="flex-direction: row;margin-left:30px;">
+					<text style="font-size:35px;">材料数量:</text>
+					<text style="color:#0080FF;font-size:35px;">{{materialNum}}</text>
+				</view>
+			</view>
+
+
+			<scroller class="scroller" style="flex:1;width:750px;">
+				<scrollListItem v-if="selfdetailList.length" v-for="(item,index) in selfdetailList" :key="index" :item="item"></scrollListItem>
+			</scroller>
+			<view class="bottom-button">
+				<text class="same-button-left" style="flex:1;border-style: solid;border-right-width: 2px;border-color: white;"
+				 @click.stop="onUnquality">不合格</text>
+				<text class="same-button-right" style="flex:1;" @click.stop="onquality">合格</text>
+			</view>
+			 
+		<!-- 	<potchange v-if="showpotChange" @onClosetemp="showpotChange=false" :washstate="'prepare'"></potchange> -->
+	     	<unqualityreson v-if="showunqualityReson" :refreshpage="refreshpage" :machines="machines" :unqualityResons="unqualityResons" @closeUnqualityReson="onCloseUnqualityReson"></unqualityreson>
+		</view>
+
+		<wxc-loading :show="loading"></wxc-loading>
+
+	</view>
+</template>
+
+
+<script>
+	let timer;
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {
+		WxcLoading,
+		WxcDialog
+	} from 'weex-ui';
+	import Navhearder from '../_mods/navhearder.nvue';
+	// import loadingmore from '../_mods/loading-more.nvue';
+	import scrollListItem from '../_mods/wash-scroll-item.nvue';
+	import unqualityreson from './components/unquality-reson.nvue';
+	// import potchange from '../wash/components/potchange.nvue';
+// 	import {
+// 		formatDate
+// 	} from "../../common/tool.js";
+
+	// import reclaimDetail from "../reclaim/components/reclaim-detail.nvue";
+
+
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	import * as _ from '../../common/lodash.min.js';
+	import {
+		unquality,publicSelect
+
+	} from "../../common/api.js";
+
+
+
+	export default {
+		mixins: [myMixin],
+		components: {
+			Navhearder,
+			WxcLoading,
+			scrollListItem,
+			unqualityreson
+			// scrollerComponent,
+			// potchange
+		},
+		data() {
+			return {
+				start: '',
+				activeMachine: {},
+				loading: false,
+				loginForm: {},
+				selfdetailList: [],
+				showunqualityReson:false,
+				packNum: 0,
+				materialNum: 0,
+                loading:false,
+				unqualityResons:[],
+				machines:[],
+
+			}
+		},
+
+		created() {
+			this.setbarheight();
+			storage.getItem('washdetailList', event => {
+				this.selfdetailList = JSON.parse(event.data);
+			})
+			
+			storage.getItem('activeWashmachine', event => {
+			
+				this.activeMachine = JSON.parse(event.data);
+					
+				this.start = this.activeMachine.start_dt.slice().substring(11, this.activeMachine.start_dt.length);
+				this.countNum();
+				storage.getItem('washmachineList', event => {
+					this.machines = JSON.parse(event.data).filter((item)=>{
+							return item.id!=this.activeMachine.dev_id;
+					});
+					console.log('wascheck machines')
+					console.log(JSON.stringify(this.machines))
+				})
+				
+			})
+		
+
+			storage.getItem('loginForm', event => {
+				this.loginForm = JSON.parse(event.data);
+			})
+			this.refreshpage.bind(this);
+		},
+
+		methods: {
+			 refreshpage(item){
+				storage.getItem('washchechjumpPage', event => {
+				     if(event.data=="washresult"){
+				     	 uni.postMessage({key: "freshwashresult",value:''});
+				     }else{
+						 uni.postMessage({key: "washmachine",value:this.activeMachine});
+						 if(item){
+							 uni.postMessage({key: "washmachine",value:item});
+						 }
+				     }
+					    uni.navigateBack({delta: 1}); 
+				})
+			
+				
+			},
+			onquality(){
+				const data={"Qx":{
+					"did":this.loginForm.deptId,
+					"jgms":0,
+					"result":"1",
+					"sb_type":this.activeMachine.sb_type,
+					"state":this.activeMachine.state,
+					"state_name":this.activeMachine.state_name,
+					
+					"d_gc":this.activeMachine.d_gc,
+					"dev_id":this.activeMachine.dev_id,
+					"dev_name":this.activeMachine.dev_name,
+					
+					"end_dt":this.activeMachine.end_dt,
+					"id":this.activeMachine.id,
+					"plan_time":this.activeMachine.plan_time,
+				  "cre_uid":this.loginForm.userId,
+				"cre_uname":this.loginForm.userName,
+					"start_dt":this.activeMachine.start_dt,
+					"t_gc":this.activeMachine.t_gc
+				   },"LoginForm":this.loginForm};
+				   unquality(data).then(res=>{
+					   
+					if (res.errorCode == "0") {
+						modal.toast({message: '检定成功'});
+					   this.refreshpage();
+					
+				   }else{
+					   modal.toast({message: res.message});
+				   }
+				})
+			},
+			onCloseUnqualityReson(e){
+				this.showunqualityReson=false;
+			},
+			countNum(){
+				this.selfdetailList.forEach(item=>{
+					this.packNum+=Number(item.b_num);
+					this.materialNum+=(item.qx_num?Number(item.qx_num):0);
+				})
+			},
+			onUnquality(){
+				const data={"AA10":{"aaa100":"QX_BHGYY"},"LoginForm":this.loginForm};
+				publicSelect(data).then(res=>{
+					if (res.errorCode == "0") {
+						this.showunqualityReson=true;
+						this.unqualityResons=res.returnValue.AA10List;
+					}
+				})
+			}
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style scoped>
+	.left-first {
+		font-size: 40px;
+		color: #666666;
+	}
+	
+	.left-last {
+		font-size: 35px;
+		color: #A5A5A5;
+	}
+
+	.same-button-right {
+		font-size: 45px;
+		text-align: center;
+		color: white;
+		height: 90px;
+		line-height: 90px;
+		background-color: #0080FF; 
+	}
+	.same-button-left {
+		font-size: 45px;
+		text-align: center;
+		color: white;
+		height: 90px;
+		line-height: 90px;
+		background-color: #FA6865;
+	}
+		.bottom-button {
+		width: 750px;
+		height: 90px;
+		flex-direction: row;
+	}
+	
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	.washfree-main-noplate {
+		flex: 1;
+		align-items: center;
+		justify-content: center;
+
+	}
+
+	.noplate-text {
+		margin-top: 50px;
+		font-size: 33px;
+		color: #A5A5A5;
+	}
+
+	.start-wash {
+		flex: none;
+		background: #0080FF;
+		font-size: 38upx;
+		color: #FFFFFF;
+		height: 100px;
+	}
+
+	.split {
+		background-color: #F3F3F3;
+		height: 20px;
+		width: 750px;
+		flex: none;
+	}
+
+	.samesize {
+		font-size: 33px;
+		color: #A5A5A5;
+	}
+
+	.program {
+		display: flex;
+		flex-direction: row;
+		flex: none;
+		justify-content: space-around;
+		flex-wrap: wrap;
+		width: 750px;
+		padding: 20px 30px 20px 30px;
+
+
+	}
+
+	.activeprogram {
+
+		background-color: #0080FF;
+	}
+
+	.bottom-text {
+		color: white;
+	}
+
+	.program-item {
+		display: flex;
+		flex-direction: row;
+
+		flex-direction: column;
+		justify-content: center;
+		width: 210px;
+		margin: 10px;
+		border-color: #0080FF;
+		border-width: 2px;
+		/* 	border: 1upx solid #0080FF; */
+		border-radius: 8px;
+		height: 92px;
+		padding: 10px 0 10px 0;
+
+	}
+
+	.bottom-text {
+		font-size: 25px;
+		color: #A5A5A5;
+	}
+
+	.program-item.active {
+		border-color: #D2D2D2;
+		border-width: 2px;
+		color: #D2D2D2;
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	.item-content {
+		padding: 0 20px 0 20px;
+	}
+
+	.timefont {
+		font-size: 30px;
+		color: #A5A5A5;
+	}
+
+	.washing {
+		color: #F5A623;
+	}
+
+	.day-time1 {
+		font-size: 33px;
+		color: #A5A5A5;
+	}
+
+	.day-time2 {
+		color: #0080FF;
+		font-size: 35px;
+	}
+
+	.main-list {
+
+		flex: 1;
+	}
+
+	.machine {
+		font-size: 38px;
+		color: #333333;
+	}
+
+
+
+	.item-state {
+
+		flex: none;
+		border-radius: 100px;
+		padding: 5px 10px 5px 10px;
+		box-sizing: content-box;
+	}
+
+	.free {
+		background-color: #41B862;
+	}
+
+	.inwashing {
+		background-color: #F5A623;
+	}
+
+	.notdocimasy {
+		background-color: #0080FF;
+	}
+
+	.prepare {
+		background-color: #A5A5A5;
+	}
+</style>

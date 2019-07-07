@@ -1,0 +1,71 @@
+<template>
+	<view style="width:750px;" class="list-item border-bottom">
+
+		 <image src="../../static/img/timg.jpg" class="timg-image"  alt=""></image>
+		 <view class="item-content">
+			 <view style="flex-direction: row;align-items: center;justify-content: space-between;">
+				 <view style="flex:1;">
+					  <text  v-if="item.clid" class="more-fontsize" style="flex:1;">{{item.clmc}}</text> 
+					  <text v-if="item.clid" style="font-size:30px;">({{item.bmc}})</text>
+					  <text v-if="!item.clid" class="more-fontsize">{{item.bmc}}</text>
+				 </view>
+				 <view style="flex:none;">
+					 <text style="font-size:30px;">{{item.sh_pc}}*{{item.sh_num}}</text>
+				 </view>
+			 </view>
+			  <view class="wrap" style="flex-direction: row;align-items: center;justify-content: space-between;">
+				  	<text class="same-fontsize">{{item.ksname}}</text>
+				   <text  class="same-fontsize">{{item.sh_type_name}}</text>
+			 					
+			  </view>
+			  <view class="wrap" style="flex-direction: row;align-items: center;justify-content: space-between;">
+			  				  	<text class="same-fontsize">{{item.cre_uname}}</text>
+			  				   <text  class="same-fontsize">{{item.cre_dt}}</text>
+			  			 					<!-- <text class="same-fontsize">{{item.sh_type_name}}*{{item.sh_num}}</text> -->
+			  </view>
+		 </view>
+		 <!-- <img src="../../static/img/i-right.png" style="width:10px;height:20px;margin:0 20px 0 20px;" alt=""> -->
+	</view>
+</template>
+
+<script>
+	export default {
+		props:['item'],
+		created(){
+			console.log('item');
+			console.log(JSON.stringify(this.item))
+		},
+		methods:{
+		}
+	}
+</script>
+
+<style>
+
+	 .border-bottom{
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+   .timg-image{
+	 width:150px;
+	 height:150px;
+	 padding:15px;
+	 flex:none;
+   }
+   .item-content{
+	    padding-right:20px;
+	   flex:1;
+   }
+   
+   .list-item{
+	   padding:0 20px;
+	   flex-direction: row;
+	   align-items: center;
+   }
+   .more-fontsize{
+	  font-size:40px;
+   }
+   .same-fontsize{
+	   font-size:35px;
+   }
+</style>

@@ -1,0 +1,63 @@
+<template>
+	<view class="border-bottom" style="padding-left:25px;padding-right:25px;justify-content: space-between;padding-top:10px;padding-bottom:10px;" @click="showitemdetail">	
+		<view class="free-item-bottom" style="flex:none;">
+			<text style="width:300px;font-size:29px;">{{item.bmc}}</text>
+			<text class="hight base-font-item" style="flex:1;">{{item.tmid}}</text>
+		
+			<text class="hight base-font-item" style="flex:1;">{{item.cre_dt?item.cre_dt:''}}</text>
+		</view>
+	</view>
+</template>
+
+<script>
+
+	export default {
+		props: ['item'],
+		components: {
+
+		},
+
+		data() {
+			return {
+
+			}
+		},
+		created(){
+			console.log('fsdfs');
+			console.log(JSON.stringify(this.item));
+			
+		},
+		methods: {
+			showitemdetail(){
+				this.$emit('showitemdetail',this.item)
+			}
+		}
+	}
+</script>
+
+<style scoped>
+	 .border-bottom{
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+	.free-item-bottom {
+		flex-direction: row;
+		align-items: center;
+		color: #A5A5A5;
+	
+	}
+	.same-margin{
+		margin:0 10px 0 10px;
+	}
+	.hight{
+		font-size: 29px;
+	}
+	.machine-text {
+			font-size: 42px;
+			color: #333333;
+	}
+	.base-font-item{
+		font-size:33px;
+	}
+	
+</style>

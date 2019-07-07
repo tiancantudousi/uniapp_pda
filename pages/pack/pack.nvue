@@ -1,0 +1,167 @@
+<template>
+		<view class="maincontent">
+			<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+			<view class="home-content" style="position:relative;">
+				<!-- 单独header组件 -->
+				<navhearder @stepClick="stepClick" :buttonList="['打包','统计']" :loginForm="loginForm"></navhearder>
+				<cencuComponent @showdetail="showdetail" v-if="activeTabIndex==1"></cencuComponent>
+				<view v-if="activeTabIndex==0">
+					<view class="flexbetween input-row border-bottom">	
+					    <text style="font-size:35px;">包条码:</text>
+						<input style="height:60px;font-size:35px;flex:1;margin-left:30px;" type="number" v-model="tmid" placeholder="请录入包条码" return-key-type="search" @return="dopack"></input>	
+					</view>
+					
+								
+					<scroller class="scroller" style="flex:1;width:750px;">
+						<packlistItem v-for="(item,index) in packList"  :item="item" :key="index"></packlistItem>	
+						<!-- <loadingmore v-if="washresultList.length" :loadingType="loadingType"></loadingmore> -->
+					</scroller>
+				</view>
+				
+
+				  
+				 
+				  <wxc-loading :show="loading"></wxc-loading>
+				<wxc-dialog :title="'提示'"
+				        :content="'包条码'+tmid+'已打包，是否撤销？'"
+				        :show="showDialog"
+						 @wxcDialogCancelBtnClicked="showDialog=false"
+				        @wxcDialogConfirmBtnClicked="docancle"
+				      ></wxc-dialog>
+                   <packdetail v-if="ifdetail" :item="detailitem" :name="'打包明细'" @closeDetail="ifdetail=false"></packdetail>
+			 </view> 
+			
+			  
+	    </view>
+</template>
+
+<script>
+	const globalEvent = weex.requireModule('globalEvent')
+	import Navhearder from '../_mods/navhearder.nvue';
+	// import loadingmore from '../_mods/loading-more.nvue';
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	// import {formatDate} from "../../common/tool.js";
+	import packdetail from "../_mods/packdetail.nvue";
+	import packlistItem from "../_mods/packlist-item.nvue";
+	import cencuComponent from "../_mods/pack-cencus.nvue";
+	import * as _ from '../../common/lodash.min.js';
+	import {WxcLoading,WxcDialog} from 'weex-ui';
+	import {
+		dopack,canclepack
+	} from "../../common/api.js";
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	
+	
+	export default {
+		mixins: [myMixin],
+		components: {WxcLoading,packlistItem,Navhearder,WxcDialog,cencuComponent,packdetail},
+	
+		data() {
+			return {
+			
+				loginForm:{},
+				activeTabIndex:0,
+				tmid:'',
+				packList:[],
+				showDialog:false,
+				ifdetail:false,
+				detailitem:''
+				
+			}
+		},
+		created(){
+				storage.getItem('loginForm', event => {
+				  this.loginForm = JSON.parse(event.data);
+				})
+		},
+		methods:{
+			showdetail(item){
+				this.ifdetail=true;
+				this.detailitem=item;
+			},
+			judgeScanType(data){
+				let reg=new RegExp('^(TM|tm)');
+				if(reg.test(data)){//包扫码
+					this.tmid = data.slice(2,data.length);
+					this.dopack();
+				}		
+			},
+			stepClick(index){
+				this.activeTabIndex=-1;
+				setTimeout(()=>{
+					this.activeTabIndex=index;
+				},1)
+				
+			},
+			dopack() {
+				if(this.tmid==''){
+					modal.toast({message: "包条码不能为空"});
+					return;
+				}
+				const data = {
+					"PbLog": {
+						"opt_uid": this.loginForm.userId,
+						"opt_uname": this.loginForm.userName,
+						"tmid": this.tmid
+					},
+					"LoginForm": this.loginForm
+				};
+				dopack(data).then(res => {
+					if (res.status == "OK") {
+						let item = res.returnValue.tmxxList[0];
+			
+							this.packList.push({
+								bmc: item.bmc,
+								tmid: item.tmid,
+								xq_start: item.xq_start,
+								pb_uname: item.pb_uname
+							})
+			
+					
+						this.tmid = "";
+					}
+					if (res.status == 'warn') {
+						this.showDialog = true;
+					}
+					if(res.status=="error"){
+						modal.toast({message: res.message});
+					}
+				})
+			},
+			docancle() {
+				this.canclepack(this.tmid);
+				this.showDialog = false;
+			},
+			canclepack(tmid) {
+				const data = {
+					"PbLog": {
+						"tmid": tmid
+					},
+					"LoginForm": this.loginForm
+				};
+				canclepack(data).then(res => {
+					if (res.errorCode == "0") {
+						modal.toast({message: "撤销成功"});
+						this.packList = this.packList.filter(item => {
+							return item.tmid != tmid;
+						})
+						this.tmid='';
+					}
+				})
+			}
+			
+			
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style scoped>
+	.cencus-font{
+		font-size: 80px;
+			color: #FFA613;
+	}
+
+</style>

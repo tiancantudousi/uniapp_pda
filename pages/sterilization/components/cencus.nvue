@@ -1,0 +1,270 @@
+<template>
+	<view style="flex:1" @click="closeAllselect">
+		   
+			<view class="input-row flexbetween border-bottom">
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="startTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('start')" placeholder="日期" />
+							<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="endTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('end')" placeholder="日期" />
+							<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+			</view>
+			<view class="flexaround input-row border-bottom" style="align-items: center;">
+				<view class="flexaround paddingimage" @click="showSelect('machineSelect')" style="flex:1;">
+					<text style="flex:1;height:60px;line-height:60px;font-size:35px;" :style="{'color':machine.id?'black':'gray'}">{{machine.name}}</text>
+					<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+				</view>
+				<input style="height:60px;flex:1;margin-left:30px;" type="number" v-model="numgc" placeholder="请录入锅次" return-key-type="search" @return="initgetwashcensusList"></input>	
+			</view>
+			<view class="flexbetween input-row border-bottom">	
+			        <view class="flexaround paddingimage" @click="showSelect('resultSelect')" style="flex:1;">
+			        	<text style="flex:1;height:60px;line-height:60px;font-size:35px;" :style="{'color':result.title!='请选择灭菌结果'?'black':'gray'}">{{result.title}}</text>
+			        	<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+			        </view>
+					<view class="flexaround paddingimage"  @click="showSelect('personSelect')" style="flex:1;">
+						<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="vperson" return-key-type="search" @return="enterchoseperson" placeholder="请选择人员" @input="onsearchperson($event.value)"></input>			
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+			    
+			</view>
+
+			
+				<scroller class="scroller" style="flex:1;width:750px;" @loadmore="scrolltoBottom" :loadmoreoffset="20">
+					<cencusItem v-for="(item,index) in washresultList" :item="item" :key="index"></cencusItem>	
+					<loadingmore v-if="washresultList.length" :loadingType="loadingType"></loadingmore>
+				</scroller>
+			
+		 <scrollerComponent 
+		 :listshow="machineSelect"
+		  @chose="onChoosemachine"  
+		  :width="'400'" 
+		  :height="'400'" 
+		  :left="'20'" 
+		  :top="'170'" 
+		  :dataList="machineList" 
+		  :lable="'name'"></scrollerComponent> 
+		  	 <scrollerComponent 
+		  :listshow="resultSelect"
+		   @chose="onChooseResult"  
+		   :width="'370'" 
+		   :height="'400'" 
+		   :left="'20'" 
+		   :top="'260'" 
+		   :dataList="resultList" 
+		   :lable="'title'"></scrollerComponent> 
+		   
+		     	 <scrollerComponent 
+		   :listshow="personSelect"
+		    @chose="onChoosePerson"  
+		    :width="'370'" 
+		    :height="'400'" 
+		    :left="'375'" 
+		    :top="'260'" 
+		    :dataList="personList" 
+		    :lable="'us_username'"></scrollerComponent> 
+		   
+		  
+		   <wxc-loading :show="loading"></wxc-loading>		
+		
+		<!--  <cencusDetail v-if="showdetailitem" :startTime="startTime" :endTime="endTime" @closeDetail="showdetailitem=false" :item="activeitem"></cencusDetail> -->
+	</view>
+</template>
+
+<script>
+	let personlist;
+	import scrollerComponent from '../../_mods/scroller.nvue';
+	import loadingmore from '../../_mods/loading-more.nvue';
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {formatDate} from "../../../common/tool.js";
+	import cencusItem from "./sterilization-result-item.nvue";
+	import * as _ from '../../../common/lodash.min.js';
+	import {WxcLoading} from 'weex-ui';
+	import {
+		getsterilizationcensusList,
+		getpersonlist
+	} from "../../../common/api.js";
+	import {
+		myMixin
+	} from "../../../common/mixins.js";
+	import {
+		datewarnmixins
+	} from "../../../common/datewarnmixins.js";
+	
+	export default {
+		props:{'todayReclaimNum':String},
+		mixins: [myMixin,datewarnmixins],
+		components: {scrollerComponent,WxcLoading,loadingmore,cencusItem},
+	
+		data() {
+			return {
+				numgc:'',
+				page:1,
+				pageSize:20,
+                machineSelect:false,
+				loading:false,
+				startTime:formatDate(new Date(),"yyyy-MM-dd"),
+				endTime:formatDate(new Date(),"yyyy-MM-dd"),
+				loadingType:2,
+				machineList:[],
+				machine:{name:'请选择清洗机'},
+				washresultList:[],
+				userid:'',
+				result:{'title':'请选择清洗结果'},
+				resultSelect:false,
+				resultList:[{title:'全部'},{title:'合格'},{title:'不合格'}],
+				personList:[],
+				personSelect:false,
+				loginForm:{}
+				
+			}
+		},
+		created(){
+			this.getsystime().then(res=>{
+				this.startTime=res.slice(0,11);
+				this.endTime=res.slice(0,11);
+				storage.getItem('loginForm', event => {
+				  this.loginForm = JSON.parse(event.data);
+				  this.getsterilizationcensusList();
+				  this.getpersonlist();
+				
+				})
+			})
+            storage.getItem('sterilizationmachineList', event => {
+             	this.machineList = JSON.parse(event.data)
+             })
+
+
+		},
+		methods:{
+			onsearchperson(e){
+				
+				this.personSelect=true;
+				this.searchPerson(e)
+			},
+			datechange(timestate){
+				
+				if(this.warningdate({'start':this.startTime,'end':this.endTime})){
+					timestate=='end'?modal.toast({message:'结束时间不得小于开始时间！'}):modal.toast({message:'开始时间不得大于结束时间！'});
+					return;
+				}
+			    this.initgetwashcensusList();
+			},
+			closeAllselect(){
+				this.resultSelect=false;
+				this.machineSelect=false;
+				this.personSelect=false;
+			
+			},
+			showSelect(name){
+			    if(name!="machineSelect"){
+					this.machineSelect=false;
+				}
+				if(name!="resultSelect"){
+					this.resultSelect=false;
+				}
+					if(name!="personSelect"){
+					this.personSelect=false;
+				}
+			
+			    setTimeout(()=>{
+					this[name]=!this[name];
+				},20)
+				
+			},
+			scrolltoBottom(){
+				this.page++;
+			    this.loadingType=1;
+				this.getsterilizationcensusList();
+			},
+			initparmas(){
+				this.washresultList=[];
+				this.page=1;
+			},
+			getpersonlist(){//获取下收人列表
+				const data={"Userinfo":{"us_deptid":this.loginForm.deptId},"LoginForm":this.loginForm};
+				getpersonlist(data).then(res=>{
+					if(res.errorCode == "0"){
+						personlist=res.returnValue.UserinfoList;
+						this.searchPerson('');
+					}
+					
+				})
+			},
+			async searchPerson(e){
+				
+				this.personList=await this.searchthrottle(e,personlist,'us_username','us_alph');
+			},
+			onChoosePerson(item){
+				this.vperson=item.us_username;
+				this.personSelect=false;
+				this.userid=item?item.us_userid:'';
+				this.initgetwashcensusList();	
+			},
+			enterchoseperson(){
+				let value=this.vperson;
+				let temperson=personlist.find(item=>{
+					return item.us_userid==value||item.us_username==value
+				});
+				if(!temperson){
+					modal.toast({message: '操作人不存在!'});
+					return;
+				}
+				
+				this.onChoosePerson(temperson);
+			},
+			onChooseResult(item){
+				this.resultSelect=false;
+				this.result=item;
+				// this.result=item.title=="合格"?'1':item.title=="不合格"?'0':'';
+				this.initgetwashcensusList();
+			},
+			initgetwashcensusList(){
+				this.initparmas();
+				this.getsterilizationcensusList();
+			},
+			onChoosemachine(item){
+				this.machineSelect=false;
+				this.machine=item;
+				this.initgetwashcensusList();
+			},
+			getsterilizationcensusList(){
+				const data={"Mj":
+				{"jssj":this.endTime+" 23:59:59",
+				"kssj":this.startTime+" 00:00:00",
+				"cre_uid":this.userid,
+				"d_gc":this.numgc,
+				"dev_id":this.machine.id,
+				"result":this.result.title=="合格"?'1':this.result.title=="不合格"?'0':''},"PageReq":{"page":this.page,"rows":this.pageSize},"LoginForm":this.loginForm};
+				this.loading=true;
+				
+					getsterilizationcensusList(data).then(res=>{
+						this.loading=false;
+						this.loadingType=res.returnValue.rows.length<this.pageSize?2:0;
+						if(this.page==1&&!res.returnValue.rows.length){
+							modal.toast({message: '未查询到相关记录!'});
+						}
+						
+						let temparr=res.returnValue.rows.map(item=>{
+								return {result:item.result,hx_result:item.hx_result,sw_result:item.sw_result,wl_result:item.wl_result,dev_name:item.dev_name,d_gc:item.d_gc,t_gc:item.t_gc,start_dt_mj:item.start_dt_mj}
+							})
+						this.washresultList=this.washresultList.concat(temparr);
+						console.log(this.washresultList,"灭菌统计结果列表");
+					})
+					
+			
+			},
+			
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+<style scoped>
+	.cencus-font{
+		font-size: 80px;
+			color: #FFA613;
+	}
+
+</style>

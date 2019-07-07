@@ -1,0 +1,201 @@
+<template>
+		<view class="maincontent">
+			<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+			<view class="home-content" style="position:relative;">
+				<!-- 单独header组件 -->
+				<navhearder @stepClick="stepClick" :buttonList="['清洗结果']" :loginForm="loginForm"></navhearder>
+				<view class="flexaround input-row border-bottom" style="align-items: center;">
+								<view class="flexaround paddingimage" @click="showSelect('machineSelect')" style="flex:1;">
+									<text style="flex:1;height:60px;line-height:60px;font-size:35px;" :style="{'color':machine.id?'black':'gray'}">{{machine.name}}</text>
+									<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+								</view>
+								<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+									<input v-model="startTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange()" placeholder="日期" />
+								<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+								</view>
+								
+				</view>
+				<view class="flexbetween input-row border-bottom">	
+					<input style="height:60px;flex:1;margin-left:30px;" type="number" v-model="numgc" placeholder="请录入锅次" return-key-type="search" @return="initgetwashresults"></input>	
+				</view>
+				
+							
+				<scroller class="scroller" style="flex:1;width:750px;" @loadmore="scrolltoBottom" :loadmoreoffset="20">
+					<cencusItem v-for="(item,index) in washresultList" @itemClick="onItemClick" :item="item" :key="index"></cencusItem>	
+					<!-- <loadingmore v-if="washresultList.length" :loadingType="loadingType"></loadingmore> -->
+				</scroller>
+							
+				<scrollerComponent 
+				:listshow="machineSelect"
+				 @chose="onChoosemachine"  
+				 :width="'400'" 
+				 :height="'400'" 
+				 :left="'20'" 
+				 :top="'230'" 
+				 :dataList="machineList" 
+				 :lable="'name'"></scrollerComponent> 
+				  
+				 
+				  <wxc-loading :show="loading"></wxc-loading>
+				
+
+			 </view>  
+	    </view>
+</template>
+
+<script>
+	const globalEvent = weex.requireModule('globalEvent')
+	import Navhearder from '../_mods/navhearder.nvue';
+	import scrollerComponent from '../_mods/scroller.nvue';
+	// import loadingmore from '../_mods/loading-more.nvue';
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {formatDate} from "../../common/tool.js";
+	import cencusItem from "../wash/components/wash-result-item.nvue";
+	import * as _ from '../../common/lodash.min.js';
+	import {WxcLoading} from 'weex-ui';
+	import {
+		resultMachines,getwashresults,getMachineDetail
+	} from "../../common/api.js";
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	
+	
+	export default {
+		mixins: [myMixin],
+		components: {scrollerComponent,WxcLoading,cencusItem,Navhearder},
+	
+		data() {
+			return {
+				startTime:formatDate(new Date(),"yyyy-MM-dd"),
+				numgc:'',
+				loginForm:{},
+				page:1,
+				pageSize:20,
+                machineSelect:false,
+				loading:false,
+			
+				machineList:[],
+				machine:{name:'请选择清洗机'},
+				washresultList:[],
+				
+			}
+		},
+		created(){
+			this.getsystime().then(res=>{
+				this.startTime=res.slice(0,11);
+				storage.getItem('loginForm', event => {
+				  this.loginForm = JSON.parse(event.data);
+				  this.getwashresults();
+				  this.resultMachines();
+				})
+			})
+			globalEvent.addEventListener("plusMessage", e => {
+			    if (e.data.key=="freshwashresult") { //存在num时才赋值，在nvue里调用uni的API也会触发plusMessage事件，所以需要判断需要的数据是否存在
+				
+				   this.getwashresults();
+				   // this.outsourcingsearch();
+			    }
+			});
+
+
+		},
+		methods:{
+			onItemClick(item){
+				storage.setItem('activeWashmachine', item, event => {
+					this.getMachineDetail(item);
+				})
+			},
+			getMachineDetail(item){
+				this.loading=true;
+				const data={"Qx":{"d_gc":item.d_gc,"dev_id":item.dev_id,"dev_name":item.dev_name,"t_gc":item.t_gc},"LoginForm":this.loginForm};
+				getMachineDetail(data).then(res=>{
+					if (res.errorCode == "0") {
+						storage.setItem('washdetailList', res.returnValue.qxDtlList, event => {
+							storage.setItem('washchechjumpPage','washresult',e=>{
+								uni.navigateTo({
+									url: '/pages/washcheck/washcheck'
+								});
+							})
+						})
+					}
+					this.loading=false;
+					
+				}).catch((error)=>{this.loading=false;})
+			},	
+			onChoosemachine(item){
+				this.machineSelect=false;
+				this.machine=item;
+				this.initgetwashcensusList();
+			},
+			getwashresults(){
+				const data={"Qx":{"d_gc":this.numgc,"dev_id":this.machine.id,"start_dt":this.startTime+" 00:00:00"},"LoginForm":this.loginForm};
+				getwashresults(data).then(res=>{
+					if(res.status=="OK"){
+						if(!res.returnValue.qxResultList.length){
+							modal.toast({message: '未查询到相关记录!'});
+							return;
+						}
+						this.washresultList=res.returnValue.qxResultList;
+					}
+				}).catch((error)=>{this.loading=false;})
+			},
+			resultMachines(){
+				const data={"Sbxx":{"did":this.loginForm.deptId,"is_inv":"1","sb_type":"1~2~9"},"LoginForm":this.loginForm};
+				resultMachines(data).then(res=>{
+					if(res.errorCode == "0"){
+						this.machineList=res.returnValue.SbxxList;
+						storage.setItem('washmachineList', res.returnValue.SbxxList, event => {})
+					}
+				})
+			},
+			stepClick(){
+				
+			},
+			datechange(){
+			    this.initgetwashresults();
+			},
+			closeAllselect(){
+				this.machineSelect=false;
+			},
+			showSelect(name){
+			    if(name!="machineSelect"){
+					this.machineSelect=false;
+				}
+			    setTimeout(()=>{
+					this[name]=!this[name];
+				},20)
+			},
+			scrolltoBottom(){
+				this.page++;
+			    this.loadingType=1;
+				this.getwashresults();
+			},
+			initparmas(){
+				this.washresultList=[];
+				this.page=1;
+			},
+			initgetwashresults(){
+				this.initparmas();
+				this.getwashresults();
+			},
+			
+			onChoosemachine(item){
+				this.machineSelect=false;
+				this.machine=item;
+				this.initgetwashresults();
+			}
+			
+			
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style scoped>
+	.cencus-font{
+		font-size: 80px;
+			color: #FFA613;
+	}
+
+</style>

@@ -1,0 +1,100 @@
+<template>
+	<view class="nav-content">
+		<!-- 单独header组件 -->
+		<view class="nav-bar-header" style="flex-direction: row;background-color: #0080FF;align-items: center;height:90px;">
+			<view class="flexcenter" style="padding-right:20px;width:150px;">
+				<image style="height:61px;width:35px;" src="../../static/img/i-back.png" alt="" @click="goback"> </image>
+			</view>
+			<view class="btn-list" style="flex-direction: row;flex:1;" :class="[buttonList.length>1?'flexbetween':'flexcenter']">
+				<view class="flexcenter" style="position:relative;height:90px;" v-for="(item,index) in buttonList" :key="index"
+				 @click.stop="stepClick(item,index)">
+					<text style="font-size: 48px;color:white;" :style="{'opacity':activeIndex==index?'1':'0.7'}">{{item}}</text>
+
+					<text style="position:absolute;width:60px;height:12px;background-color: #FFC205;bottom:0;left:50%;border-radius: 5px;;"
+					 v-if="activeIndex==index"></text>
+				</view>
+			</view>
+			<view style="width:150px;">
+
+			</view>
+		</view>
+		<view class="flexaround" style=" background-color: #F3F3F3;height:60px;">
+			<text style="color: #666666;font-size:30px;margin:0 30px;">{{loginForm.userName}}</text>
+			<text style="border-left-style:solid;border-left-width:2px;border-color:#D2D2D2;height:50px;"></text>
+			<text style="height:50px;line-height:50px;">{{loginForm.deptId}}</text>
+			<text style="border-right-style:solid;border-right-width:2px;border-color:#D2D2D2;height:50px;"></text>
+			<text style="color: #666666;font-size:30px;margin:0 30px;">{{loginForm.deptName}}</text>
+		</view>
+		<!-- 单独header组件 -->
+	</view>
+</template>
+
+<script>
+	export default {
+		 props: {
+		  buttonList: Array,
+		  loginForm:Object
+		},
+		
+			data() {
+					return {
+				
+						
+						activeIndex:0,
+					
+					
+						
+				
+					}
+				},
+				created() {
+				
+			
+					
+				
+				},
+					
+				methods: {
+					stepClick(item,index){
+						if(this.activeIndex==index){
+							return;
+						}
+						this.$emit('stepClick',index);
+						this.activeIndex=index;
+// 						this.activeIndex=-1;
+// 						setTimeout(()=>{this.activeIndex=index;},0)
+						
+					},
+					goback(){
+						uni.navigateBack({
+						  delta: 1
+						});
+					}
+				}
+	}
+</script>
+
+<style>
+	.nav-content {
+		width: 750px;
+		height: 150px;
+	}
+
+	.flexaround {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-around;
+	}
+
+	.flexcenter {
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.flexbetween {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+</style>

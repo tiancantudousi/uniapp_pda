@@ -1,0 +1,235 @@
+<template>
+	<view style="width:750px;position:absolute;top:0;left:0;background-color: rgba(0, 0, 0, 0.5);" :style="{height:mainContentHeight+'wx'}" @click="closeall">
+		<view style="width:750px;height:1000px;position:absolute;bottom:0;left:0;background-color: white;">
+			<view class="head border-bottom">
+	<!-- 			<text style="font-size:35px;" @click="closeAdd(false)">取消</text>
+				<text style="font-size:35px;">{{activeMachine.dev_name}}</text>
+			
+				<wxc-button text="确定" :disabled="disabledsure" type="blue" :btn-style="{width:'120px',height:'60px'}" :text-style="{fontSize:'30px',color:'white'}" @wxcButtonClicked="closeAdd(true)"></wxc-button> -->
+				
+					
+					<text style="font-size:35px;">请选择不合格原因</text>
+           <image src="../../static/img/i-close2.png" style="width:36px;height:36px;" alt="" @click.stop="closeUnqualityReson(false)"></image>
+				
+			
+			</view>
+			<!-- <view class="reson-tip"><text style="font-size: 29px;color: #666666;">请选择不合格原因</text></view> -->
+			<scroller class="scroller" style="height:250px;width:750px;">
+				<view class="reson-list-item flexbetween border-bottom" v-for="(item,index) of unqualityResons" @click.stop="choseReson(item,index)" :key="index">
+					<text style="font-size:40px;">{{item.aaa103}}</text>	
+          <image v-if="index==acresonindex" style="width:50px;height:33px;" src="../../static/img/i-Check.png" alt=""></image>
+
+				</view>
+			</scroller>
+			 <view class="reson-tip"><text style="font-size: 29px;color: #666666;">请选择灭菌机</text></view>
+			<scroller class="scroller" style="flex:1;width:750px;">
+				<view class="reson-list-item flexbetween border-bottom"  v-for="(item,index) of machines" :key="index" @click.stop="choseMachine(item,index)">
+					<text style="font-size:40px;">{{item.name}}</text>	
+          <image v-if="index==acmachineindex" style="width:50px;height:33px;" src="../../static/img/i-Check.png" alt=""></image>
+				</view>
+			</scroller>
+			<view class="one-button flexcenter" @click.stop="closeUnqualityReson(true)">
+			   
+				<text class="same-button" style="flex:1;width:750px;text-align: center;">确定</text>
+			</view>
+			
+			
+		</view>
+	<!-- 		
+		<wxc-dialog :title="''"
+		    :content="'是否换锅？'"
+		    :show="showDialog"
+			 @wxcDialogCancelBtnClicked="cancalepotchange" 
+		    @wxcDialogConfirmBtnClicked="potchange"
+		  ></wxc-dialog>
+          <wxc-loading :show="loading"></wxc-loading> -->
+			
+	</view>
+</template>
+
+<script>
+	import {WxcButton,WxcLoading} from 'weex-ui';
+	var modal = weex.requireModule('modal');
+	import {
+		getDetailsterilization
+	} from "../../../common/api.js";
+	
+	
+		import {
+		myMixin
+	} from "../../../common/mixins.js";
+	import scrollerComponent from '../../_mods/scroller.nvue';
+	const storage = weex.requireModule('storage');
+
+	export default {
+		mixins: [myMixin],
+		components: {WxcButton,WxcLoading},
+		props: ['unqualityResons','machines'],
+	
+	
+		data() {
+			return {
+		        loginForm:{},
+				mainContentHeight:'2000',
+				activeMachine:{},
+				acresonindex:-1,
+				acmachineindex:-1,
+				reson:'',
+				machine:'',
+				aftermachine:'',
+				loading:false,
+				showDialog:false
+
+			}
+		},
+		created(){
+
+			this.getmaincontentheight();
+            storage.getItem('activeWashmachine', event => {
+             	this.activeMachine = JSON.parse(event.data);
+             })
+
+			
+             
+             storage.getItem('loginForm', event => {
+             	this.loginForm = JSON.parse(event.data);
+				// this.getpotchangeResons();
+             })
+		},
+		methods: {
+// 			cancalepotchange(){
+// 				this.showDialog=false;
+// 				this.refreshpage(this.activeMachine);
+// 			},  
+			choseMachine(item,index){
+				if(this.acmachineindex==index){
+					this.acmachineindex=-1;
+					this.machine='';
+					this.aftermachine="";
+					return;
+				}
+				// this.acmachineindex=index;
+				this.machine=item;
+				this.getaftermachine(index);
+			},	
+			getaftermachine(index){
+					
+					const data={"Mj":{"dev_id":this.machine.id},"LoginForm":this.loginForm};
+					this.loading=true;
+					getDetailsterilization(data).then(res=>{
+						this.loading=false;
+						if(res.errorCode == "0"){
+
+							if(res.returnValue.mjjStateList[0].type=='1'){
+								modal.toast({message: '该锅还未进行BD灭菌，不可换锅'});
+								return;
+							};
+							if(res.returnValue.mjjStateList[0].state_name=="准备中"||res.returnValue.mjjStateList[0].state_name=="空闲中"){
+								this.acmachineindex=index;
+								this.aftermachine=res.returnValue.mjjStateList[0];
+							}else{
+								modal.toast({message: '该灭菌机处于'+res.returnValue.mjjStateList[0].state_name+'不可换锅'});
+								this.aftermachine='';
+							}
+						}else{
+							modal.toast({message: res.message});
+						}
+					}).catch((error)=>{this.loading=false;})
+			},
+
+			choseReson(item,index){
+				if(this.acresonindex==index){
+					this.acresonindex=-1;
+					this.reson='';
+					return;
+				}
+				this.acresonindex=index;
+				this.reson=item;
+			},
+		
+			closeUnqualityReson(state){
+				if(state){
+					const data={};
+					if(this.reson){
+						Object.assign(data,{},this.reson)
+					}
+					if(this.aftermachine){
+						Object.assign(data,{},this.aftermachine)
+					}
+					this.$emit('closeUnqualityReson',data)
+				}else{
+					this.$emit('closeUnqualityReson',null)
+				}
+				
+			},
+				
+				
+			async getmaincontentheight(){
+				this.mainContentHeight=await this.getmainContentHeight();
+			},
+		
+
+		},
+		mounted(){
+					
+		},
+		destroyed(){
+// 			materiallist=[];
+// 			this.packId='';
+// 			this.tmid='';
+// 			this.materialNum=1;
+// 			this.price='';
+// 			this.mark='';
+// 			this.materialId="";
+// 			this.material='';
+// 			this.disabledpack=false;
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+
+<style scoped>
+	.reson-list-item {
+		padding: 20px 30px 20px 30px;
+
+	}
+	.aligncenter{
+		align-items: center;
+	}
+	.head {
+		height:90px;
+		
+		padding: 0 30px 0 30px;;
+		position: relative;
+		flex: none;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+	.reson-tip {
+		height:60px;
+		box-sizing: border-box;
+		background-color: #F3F3F3;
+		padding: 15px;
+	}
+		.same-button{
+		   font-size:45px;
+		  /* text-align: center; */
+		   color:white;
+		/*   height:90px;
+		   line-height:90px; */
+		  
+	}
+	.one-button{
+		
+		   background-color: #0080FF;
+		  flex:none;
+		   width:750px;
+		   height:90px;
+		   align-items: center;
+		   justify-content: center;
+		 /*  flex-direction: row; */
+	}
+	
+
+</style>

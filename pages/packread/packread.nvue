@@ -1,0 +1,250 @@
+
+<template>
+	<view class="maincontent">
+		<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+		<view class="home-content" style="position:relative;">
+			<!-- 单独header组件 --> 
+		    <navhearder @stepClick="stepClick" :buttonList="buttonList"  :loginForm="loginForm"></navhearder>
+			
+			<view class="input-row border-bottom" style="align-items: center;">
+			    <input style="height:60px;flex:1;margin-left:30px;width:720px;" type="text" v-model="tmid" placeholder="请录入包条码" @return="enter()"></input>
+			</view>
+			<view style="flex:1;width:750px;">
+				<view class="head" style="flex-direction: row;" v-if="item.bmc">
+					<text style="font-size:35px;flex:1;flex-wrap: wrap;">{{item.bmc}}</text>
+					<text style="font-size:35px;">{{item.xq_desp}}日</text>
+					<!-- <img src="../../static/img/i-close1.png" class="close-img" @click="closeDetail" alt=""> -->
+				</view>
+				<view class="mainimg" v-if="detailList.length">
+        <image src="../../static/img/timg.jpg" @load="onLoadimg" :style="{height:imgHeight+'px'}" style="width:750px;" alt=""></image>
+					<text class="tip">器械数量:{{detailList.length}}</text>
+				</view>
+				<scroller class="scroller" style="flex:1;" @loadmore="scrolltoBottom" :loadmoreoffset="20">
+					<view v-if="detailList.length" v-for="(item,index) in detailList" :key="index">
+						<view class="detail-item">
+							<text class="detail-index">{{index+1}}</text>
+							<text class="detail-name">{{item.clmc}}</text> 
+							<text class="detail-num">{{item.clsl}}</text>
+						</view>
+					</view>
+				</scroller>
+			</view>
+			
+			
+		</view>
+	<!-- 		<wxc-dialog :title="'包条码：'+tmid"
+		            :content="messagecontent"
+		            :show="showdialog"
+		            @wxcDialogCancelBtnClicked="showdialog=false"
+		            @wxcDialogConfirmBtnClicked="dialogConfirmBtnClick"
+		          ></wxc-dialog> -->
+		<wxc-loading :show="loading"></wxc-loading>		
+		
+	</view>
+</template>
+
+
+<script>
+	
+	
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage')
+	import {WxcLoading,WxcDialog} from 'weex-ui';
+	import Navhearder from '../_mods/navhearder.nvue';
+	import loadingmore from '../_mods/loading-more.nvue';
+		import scrollerComponent from '../_mods/scroller.nvue';
+	// import reclaimDetail from "../reclaim/components/reclaim-detail.nvue";
+	
+	
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	import * as _ from '../../common/lodash.min.js';
+	import {
+    	getreadDetail
+	} from "../../common/api.js";
+	  
+
+		
+	export default {
+		mixins: [myMixin],
+		components: { Navhearder,WxcLoading,loadingmore,scrollerComponent,WxcDialog},
+		data() {
+			return {
+				buttonList:['包内容查询'],
+				tmid:'',
+				item:{},
+				detailList: [],
+				loading:false,
+				imgHeight:300,
+				loginForm:{},
+			}
+		},
+	
+		created() {
+			this.setbarheight();
+			this.linsentBarCode(this.judgeScanType)
+			storage.getItem('loginForm', event => {
+			    this.loginForm = JSON.parse(event.data);
+			})
+		},
+			
+		methods: {
+			enter(){
+				this.judgeScanType(this.tmid);
+			},
+			judgeScanType(value) {
+				let reg = new RegExp('^(BB|bb)');
+				let data;
+				if (reg.test(value)) { //包扫码
+				     this.tmid = value.slice(2, value.length).trim();
+					 data={"Tmxx":{"bnrList":[],"isChecked":false,"jsList":[],"zjFfList":[],"bid":this.tmid},"LoginForm":this.loginForm};
+					 this.getDetail(data);
+			         return;
+				}
+				let tmReg = new RegExp('^(TM|tm)');
+				if (tmReg.test(value)) { //人员扫码
+				    this.tmid = value.slice(2, value.length).trim();
+					data={"Tmxx":{"bnrList":[],"isChecked":false,"jsList":[],"zjFfList":[],"tmid":this.tmid},"LoginForm":this.loginForm};
+					this.getDetail(data);
+				 return;
+				}
+				let SsReg = new RegExp('^(BF|BF)');
+				if (SsReg.test(value)) { //人员扫码
+				    this.tmid = value.slice(2, value.length).trim();
+					data={"Tmxx":{"bnrList":[],"isChecked":false,"jsList":[],"zjFfList":[],"bftm":this.tmid},"LoginForm":this.loginForm};
+					this.getDetail(data);
+				    return;
+				}
+				this.handenter(value);
+				
+			},
+			handenter(value){
+				let data;
+				if(value.length>=10){
+					 data={"Tmxx":{"bnrList":[],"isChecked":false,"jsList":[],"zjFfList":[],"tmid":this.tmid},"LoginForm":this.loginForm};
+				}else{
+					data={"Tmxx":{"bnrList":[],"isChecked":false,"jsList":[],"zjFfList":[],"bid":this.tmid},"LoginForm":this.loginForm};
+				}
+				this.getDetail(data);
+			},
+			getDetail(data){
+				this.item={};
+				this.detailList=[];
+				this.loading=true;
+				console.log(JSON.stringify(data));
+				getreadDetail(data).then(res=>{
+					this.loading=false;
+					console.log(JSON.stringify(res));
+					if(res.status=="OK"){
+						if(!res.returnValue.TmxxList.length){
+							  modal.toast({message: '未查询到相关记录'});
+								  return;
+						}
+						this.detailList=this.buildList(res.returnValue.TmxxList);
+						this.item=res.returnValue.Tmxx;
+					}
+					if (res.status == "error") { //报错提示
+					    modal.toast({message: res.message});	
+					}
+				})
+			},
+			buildList(list){
+				let templist=[];
+				list.forEach(item=>{
+					templist.push({clmc:item.clmc,clsl:item.clsl});
+					if(item.clmc2){
+						templist.push({clmc:item.clmc2,clsl:item.clsl2})
+					}
+				})
+				return templist;
+			},
+			onLoadimg(e){
+				this.imgHeight=Math.floor(750*e.size.naturalHeight/e.size.naturalWidth);
+			},
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style scoped>
+
+	.maincontent {
+		display: flex;
+		flex: 1;
+		width: 750px;
+		flex-direction: column;
+	}
+	.home-content{
+		/* background-color: red; */
+		flex:1;
+		width:750px;
+		position:relative;
+	}
+	.border-bottom{
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+	.input-row{
+		height:90px;
+		width:750px;
+		padding:0 25px;
+	}
+
+  .main-list{
+	 
+	 flex:1;
+   }
+   .head {
+   	padding: 20px 30px 20px 30px;;
+   	position: relative;
+   	flex: none;
+   	flex-direction: row;
+   	align-items: center;
+   }
+   .close-img {
+   	width: 40px;
+   	height: 40px;
+   }
+   .mainimg {
+   	width: 750px;
+   	position: relative;
+   }
+   .tip {
+   	position: absolute;
+   	left: 0;
+   	top: 30px;
+   	background-color: rgba(0, 0, 0, 0.5);
+   	color: white;
+   	font-size: 33px;
+       padding:10px;
+   	border-radius:5px;
+   }
+   .detail-content {
+   	flex: 1;
+   }
+   .detail-item {
+   	display: flex;
+   	flex-direction: row;
+   	align-items: center;
+   	padding: 20px 30px 20px 30px;
+   }
+   .detail-index {
+   	font-size: 35px;
+   	color: #A5A5A5;
+   }
+   .detail-name {
+   	padding-left:30px;
+   	flex: 1;
+   	font-size: 38px;
+   	color: #333333;
+   }
+   .detail-num {
+   	font-size: 40px;
+   	color: #0080FF;
+   }
+ 
+  
+</style>
+
+
+

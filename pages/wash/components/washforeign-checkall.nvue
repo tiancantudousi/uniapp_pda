@@ -1,0 +1,52 @@
+<template>
+	<view style="width:750px;padding:10px;" class="top-list-item border-bottom" @click="showdetail">
+	
+		     <view class="checkimage-view"  :class="[!item.isChecked?'activeborder':'']" @click="onChoseItem(item)" > 
+		       	<image src="../../static/img/i-ok.png" v-if="item.isChecked" class="check-image"></image>
+		    </view>
+			
+				
+				 		<text style="font-size:35px;flex:1;margin-left:10px;">包名称</text>
+			
+			 
+			  
+			 <view style="flex-direction: row;align-items: center;flex:1;">
+						
+				 		<text style="font-size:35px;">包数量</text>
+				
+			 	
+			 </view>
+			
+	</view>
+</template>
+
+<script>
+	export default {
+		props: ['item'],
+		methods:{
+		 onChoseItem(){
+			this.$emit('checkall',this.item.isChecked);
+		 }
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+<style>
+      .top-list-item{
+    	   padding:20px;
+    	   flex-direction: row;
+    	   align-items: center;
+    }
+		  .activeborder{
+		   border-width:2px;
+		   border-color:#C7C7CC;
+	}
+	  .checkimage-view{
+		   width:60px;
+		   height:60px;
+		   border-radius: 50%;
+	} 
+	 .check-image{
+		   flex:1;
+	}
+</style>

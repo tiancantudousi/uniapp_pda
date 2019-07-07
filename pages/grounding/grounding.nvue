@@ -1,0 +1,458 @@
+<template>
+	<view class="maincontent">
+		<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+		<view class="home-content" style="position:relative;flex:1;width:750px;">
+			<!-- 单独header组件 -->
+			<navhearder @stepClick="stepClick" :buttonList="['上架','换架','统计']" :loginForm="loginForm"></navhearder>
+			<text  style="position:absolute;top:-25px;right:25px;font-size:40px;color:white" v-if="activeIndex==0" @click="onShowimport"> 
+				导入
+			</text>
+			<view class="import" v-if="toggleImport" style="flex:1;width:750px;">
+				<view class="flexaround input-row border-bottom"> 
+				   	<view class="flexcenter paddingimage" style="flex:none;width:200px;align-items: center;">
+							<input v-model="selectTime"  style="height:60px;flex:1;" class="input" type="date" placeholder="日期" />
+							<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+				   </view>
+				   <input style="height:60px;font-size:35px;flex:1;margin-left:30px;" type="number" v-model="numgc" placeholder="请录入锅次"></input>	
+				</view>
+				 <view class="reson-tip"><text style="font-size: 29px;color: #666666;">请选择灭菌机</text></view>
+				<scroller class="scroller" style="flex:1;width:750px;">
+							<view class="reson-list-item flexbetween border-bottom"  v-for="(item,index) of machines" :key="index" @click.stop="choseMachine(item,index)">
+								<text style="font-size:40px;">{{item.name}}</text>	
+				               <image v-if="index==acmachineindex" style="width:50px;height:33px;" src="../../static/img/i-Check.png" alt=""></image>
+							</view>
+				</scroller>
+				<view class="one-button flexcenter"  @click="suresearch">
+				   
+					<text class="same-button">确定</text>
+				</view>
+				
+			</view>
+			<cencus v-if="activeIndex==2"></cencus>
+			<changeshelveComponent v-if="activeIndex==1"></changeshelveComponent>
+			<view style="flex:1;width:750px;" v-if="activeIndex==0">
+				<scroller class="scroller" style="flex:1;width:750px;">
+						<groundingListItem  v-if="togroundingList.length" v-for="(item,index) in togroundingList" @onChoseItem="onChoseItem" :key="index" :item="item"></groundingListItem>
+						<loadingmore v-if="togroundingList.length" :loadingType="loadingType"></loadingmore>
+				</scroller>
+				<view class="input-row border-bottom" style="flex-direction: row;align-items: center;border-color: #E5E5E5;border-top-width:2px;">
+					<view class="checkimage-view" :class="[!choseall?'activeborder':'']" @click="onChoseall()" > 
+						<image src="../../static/img/i-ok.png" v-if="choseall" class="check-image"></image>
+					</view>
+					<text style="font-size:30px;margin-left:30px;">全选({{togroundingList.length}})</text>
+					<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="bid" return-key-type="search" placeholder="请录入包条码" @return="ondogrounding()"></input>
+				</view>
+				<view class="bottom-button">
+					<view style="flex:3;">
+	
+				    
+						<view style="padding-left: 40px;flex-direction: row;justify-content: center;flex:1;align-items: center;">
+							<view class="flexaround paddingimage" style="width:375px;" @click="showSelect('shelvesSelect')">
+								<text style="font-size:35px;">{{activeshelves.name?activeshelves.name:'请选择货架'}}</text>
+								<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+							</view>
+						</view>
+					</view>		
+					<text class="same-button" style="flex:2;" @click="suregrounding">确认上架({{accontNum}})</text>
+				</view>
+				 <scrollerComponent  :listshow="shelvesSelect" @chose="onChooseshelves"  :width="'420'" :height="'400'" :left="'20'" :bottom="'80'" :dataList="shelvesList" :lable="'name'"></scrollerComponent>
+			</view>
+
+
+
+		</view>
+				<wxc-dialog :title="'包条码：'+bid"
+		            :content="'已上架,是否撤销?'"
+		            :show="showDialog"
+		            @wxcDialogCancelBtnClicked="showDialog=false"
+		            @wxcDialogConfirmBtnClicked="cancleGrounding"
+		          ></wxc-dialog>
+		<wxc-loading :show="loading"></wxc-loading>
+
+	</view>
+</template>
+
+
+<script>
+	let groundingList=[];
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {
+		WxcLoading,
+		WxcDialog
+	} from 'weex-ui';
+	import Navhearder from '../_mods/navhearder.nvue';
+	import loadingmore from '../_mods/loading-more.nvue';
+	// import loadingmore from '../_mods/loading-more.nvue';
+	import scrollerComponent from '../_mods/scroller.nvue';
+	import groundingListItem from './components/grounding-list-item.nvue';
+	import cencus from './components/cencus.nvue';
+	import changeshelveComponent from './components/changeshelves.nvue';
+	
+	// import scrollListItem from '../_mods/wash-scroll-item.nvue';
+	// import potchange from '../wash/components/potchange.nvue';
+	import {formatDate} from "../../common/tool.js";
+	
+	// import reclaimDetail from "../reclaim/components/reclaim-detail.nvue";
+
+
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	import * as _ from '../../common/lodash.min.js';
+	import {
+		getsterilizationList,getTogrounding,dogrounding,cancleGrounding,getshelves,suregrounding
+		
+	} from "../../common/api.js";
+
+
+
+	export default {
+		mixins: [myMixin],
+		components: {
+			Navhearder,
+			WxcLoading,
+			scrollerComponent,
+			groundingListItem,
+			loadingmore,
+			WxcDialog,
+			changeshelveComponent,cencus
+		},
+		data() {
+			return {
+				selectTime:'',
+				loading: false,				
+				loginForm: {},
+				machines:[],
+				machine:'',
+				acmachineindex:-1,
+				toggleImport:false,
+				page:1,
+				pageSize:20,
+				loadingType:2,
+				accontNum:0,
+				togroundingList:[],
+				activeIndex:0,
+				activeshelves:'',
+				errormessage:'',
+				showDialog:false,
+				choseall:false,
+				shelvesSelect:false,
+				bid:'',
+				shelvename:'',
+				shelvesList:[]
+// 				page:1,
+// 				pageSize:20,
+
+			}
+		},
+
+		created() {
+			this.setbarheight();
+			this.linsentBarCode(this.judgeScanType)
+			this.getsystime().then(res=>{
+				this.selectTime=res.slice(0,11);
+				storage.getItem('loginForm', event => {
+					this.loginForm = JSON.parse(event.data);
+					this.getMachines();
+					this.getshelves();
+					this.getTogrounding();
+				})
+			});
+	
+			
+			
+		},
+  
+		methods: {
+				onChoseItem(item) { //单个包被选中
+				item.checked ? this.accontNum++ : this.accontNum--;
+			},
+			    getchoosepack(){
+				let choosepack=this.togroundingList.filter((item)=>{
+					return item.checked;
+				})
+				choosepack=choosepack.map(element=>{return {tmid:element.tmid}});
+				return choosepack;
+			},
+			suregrounding() {	
+				if(!this.activeshelves){
+					modal.toast({message: '请选择货架'});
+					return;
+				}
+				let chosenpack=this.getchoosepack();
+				if(!chosenpack.length){
+					modal.toast({message: '请选择包'});
+					return;
+				}
+				
+				const data = {
+					"CcLog":{"jz_name":this.activeshelves.name,"jz_id":this.activeshelves.id},"CcLogList":chosenpack,"LoginForm": this.loginForm
+				}
+				suregrounding(data).then(res => {
+					
+					if (res.status == "OK") {
+						modal.toast({message: '上架成功'});
+						this.togroundingList=[];
+						this.getTogrounding();
+					}
+					if(res.status == "error"){
+						modal.toast({message: res.message});
+					}
+				})
+			},
+				showSelect(name){
+			    if(name!="shelvesSelect"){
+					this.shelvesSelect=false;
+				}
+			    setTimeout(()=>{
+					this[name]=!this[name];
+				},20)
+				
+			},
+				getshelves(){
+				const data={"Jzxx":{"is_inv":"1"},"PageReq":{},"LoginForm":this.loginForm};
+				getshelves(data).then(res=>{
+					if(res.status=="OK"){
+						this.shelvesList=res.returnValue.rows;
+					}
+					if(res.status=="error"){
+						modal.toast({message: res.message});
+					}
+				})
+			},
+			onChooseshelves(item){
+				this.shelvesSelect=false;
+				this.activeshelves=item;
+				this.shelvename=item.name;
+			},
+			onChoseall() { //全部选中
+				if (!groundingList.length) {
+					return;
+				}
+				
+				this.choseall = !this.choseall;
+			
+					groundingList.forEach(item => {
+						item.checked = this.choseall ? true : false;
+					})
+					this.togroundingList = groundingList;
+					this.accontNum = this.choseall ? groundingList.length : 0;
+			
+			},
+			cancleGrounding(){
+				this.showDialog = false;
+				const data={"CcLog":{"tmidlist":[],"tmid":this.bid},"LoginForm":this.loginForm};
+				cancleGrounding(data).then(res=>{
+					
+					if(res.status=="OK"){
+						modal.toast({message: '撤销成功'});
+						this.togroundingList=[];
+						this.getTogrounding();
+					}
+					if(res.status=="error"){
+						modal.toast({message: res.message});
+					}
+				})
+			},
+			judgeScanType(data) {
+			
+				let reg = new RegExp('^(TM|tm)');
+				if (reg.test(data)) { //包扫码
+					this.bid = data.substring(2, data.length).trim();
+					this.ondogrounding();
+					return;
+				}
+				let personReg = new RegExp('^(ZG|zg)');
+				if (personReg.test(data)) { //人员扫码
+					this.downPerson = data.substring(2, data.length).trim();
+					this.onpersonEnter();
+					return;
+				}
+				modal.toast({message: `该条码${data}不存在`});
+			},
+				ondogrounding(){//上架
+					if(!this.activeshelves){
+						modal.toast({message: '请选择货架'});
+						return;
+					}
+					if(!this.bid){
+						modal.toast({message: '请录入包条码'});
+						return;
+					}
+					const data = {
+						"CcLog":{"jz_name":this.activeshelves.name,"jz_id":this.activeshelves.id,tmid:this.bid},"LoginForm": this.loginForm
+					}
+					dogrounding(data).then(res => {
+						this.errormessage = res.message;
+						if (res.status == "OK") {
+						    modal.toast({message: '上架成功'});
+							this.bid = "";
+							this.togroundingList=[];
+							this.getTogrounding();
+						}
+						if (res.status == "error") { //报错提示
+							modal.toast({message: this.errormessage});
+					
+						}
+						if (res.status == "warn") {
+							this.showDialog = true;
+						}
+					
+					
+					})
+				},
+			onShowimport(){
+				if(!this.toggleImport){
+						this.activeIndex=-1;
+					 setTimeout(()=>{this.toggleImport=true;},1)
+				}else{
+					this.toggleImport=false;
+					setTimeout(()=>{this.activeIndex=0;},1)
+				}
+			
+			},  
+				stepClick(index){
+					this.activeIndex=-1;
+			        setTimeout(()=>{this.activeIndex=index;},1)
+			},
+			getTogrounding() { //获取待上架包列表
+				const data = {
+					"Tmxx": {
+						"bnrList": [],
+						"isChecked": false,
+						"jsList": [],
+						"zjFfList": [],
+						"mj_d_gc":this.numgc,
+						"mj_dev_id":this.machine.id,
+						"mj_start_dt":this.selectTime.trim()+" 00:00:00"
+					}, //第一次登录不传 
+					"PageReq": {
+						"page": this.page,
+						"rows": this.pageSize
+					},
+					"LoginForm": this.loginForm
+				};
+					console.log('getTogroundingdata');
+				console.log(JSON.stringify(data));
+				getTogrounding(data).then(res => {
+					console.log('getTogrounding');
+					console.log(JSON.stringify(res));
+					if (res.errorCode == "0") {
+						this.accontNum=0;
+						this.loadingType = res.returnValue.rows < this.pageSize ? 2 : 0;
+						let resgroundingList = res.returnValue.rows.map(item => {
+							return {
+								bmc: item.bmc,
+								tmid: item.tmid,
+								checked: false,
+								xq_desp: item.xq_desp,
+								mj_start_dt: item.mj_start_dt
+							}
+						})
+						
+						this.togroundingList = this.togroundingList.concat(resgroundingList);
+						groundingList = this.togroundingList.slice();
+					}
+				})
+			},
+			suresearch(){
+				this.toggleImport=false;
+// 				if(!this.selectTime){
+// 					modal.toast({message: '请选择时间'});
+// 					return;
+// 				}
+// 				if(!this.machine){
+// 					modal.toast({message: '请选择灭菌机'});
+// 					return;
+// 				}
+				this.togroundingList=[];
+				setTimeout(()=>{this.activeIndex=0},1)
+				this.getTogrounding();
+			},
+             getMachines() {
+             	const data={"Sbxx":{"did":this.loginForm.deptId,"is_inv":"1","sb_type":"3~4~5"},"LoginForm":this.loginForm};
+             	getsterilizationList(data).then(res => {
+             		if (res.errorCode == "0") {
+						this.machines=res.returnValue.SbxxList;
+             		}
+             
+             	})
+             },
+		    choseMachine(item,index){
+		     	if(this.acmachineindex==index){
+		     		this.acmachineindex=-1;
+		     		this.machine='';
+		     		return;
+		     	}
+				this.acmachineindex=index;
+		     	this.machine=item;
+		     	
+		     },
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style scoped>
+	   .same-button{
+		   font-size:45px;
+		   text-align: center;
+		   color:white;
+		   height:90px;
+		   line-height:90px;
+		   background-color: #0080FF;
+	}
+		  .bottom-button{
+		   width:750px;
+		   height:90px;
+		   flex-direction: row;
+	}
+	  .check-image{
+		   flex:1;
+	}
+	  .activeborder{
+		   border-width:2px;
+		   border-color:#C7C7CC;
+	}
+	  .checkimage-view{
+		   width:60px;
+		   height:60px;
+		   border-radius: 50%;
+	} 
+	.reson-list-item {
+		padding: 20px 30px 20px 30px;
+	
+	}
+	.reson-tip {
+		height:60px;
+		box-sizing: border-box;
+		background-color: #F3F3F3;
+		padding: 15px;
+	}
+	.same-button{
+		   font-size:45px;
+		  /* text-align: center; */
+		   color:white;
+		/*   height:90px;
+		   line-height:90px; */
+		  
+	}
+	.one-button{
+		
+		   background-color: #0080FF;
+		  flex:none;
+		   width:750px;
+		   height:90px;
+		   align-items: center;
+		   justify-content: center;
+		 /*  flex-direction: row; */
+	}
+	
+	
+
+	
+	
+	
+	
+	
+</style>

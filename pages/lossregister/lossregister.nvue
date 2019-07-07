@@ -1,0 +1,254 @@
+<template>
+	<view class="maincontent" >
+		<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+		<view class="home-content" style="position:relative;">
+			<!-- 单独header组件 --> 
+		    <navhearder @stepClick="stepClick" :buttonList="buttonList"  :loginForm="loginForm"></navhearder>
+			<queryComponent v-if="activeIndex==0"></queryComponent>
+			<view style="flex:1;width:750px;" v-if="activeIndex==1" @click="closeSelect">
+					<view class="flexaround input-row border-bottom" style="align-items: center;">
+					<view class="flexaround paddingimage" @click="showSelect('deptSelect')" style="flex:2;align-items: center;">
+						<input style="height:60px;flex:1;" type="text" v-model="dept" placeholder="请输入科室拼音码" @input="onsearchdept($event)"></input>
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+				</view>
+				
+				<view class="main-list" style="flex:1;width:750px;">
+					<scroller class="scroller" @loadmore="scrolltoBottom" :loadmoreoffset="20">
+						<listItem v-for="(item,index) in addList" @update="showadditem" :item="item" ></listItem>	
+						<!-- <loadingmore v-if="todayReclaimList.length" :loadingType="loadingType"></loadingmore> -->
+					</scroller>
+				</view>
+				<view class="bottom-button">
+				    	<text class="same-button" style="flex:1;border-style: solid;border-right-width: 2px;border-color: white;" @click="add">添加</text> 
+					
+					<text class="same-button" style="flex:1;" @click="store">保存</text>
+				</view>
+				
+				<scrollerComponent :listshow="deptSelect" @chose="onChoosedept"  :width="'450'" :height="'400'" :left="'20'" :top="'80'" :dataList="kslist" :lable="'de_deptname'"></scrollerComponent>
+			</view>
+			
+		    <addComponent v-if="showadd" @closeAdd="oncloseAdd" :updateitem="updateitem" :loginForm="loginForm"></addComponent>
+		</view>
+		
+		
+		<wxc-dialog :title="'包条码：'+tmid"
+		            :content="messagecontent"
+		            :show="showdialog"
+		            @wxcDialogCancelBtnClicked="showdialog=false"
+		            @wxcDialogConfirmBtnClicked="dialogConfirmBtnClick"
+		          ></wxc-dialog>
+		<wxc-loading :show="loading"></wxc-loading>		
+		
+	</view>
+</template>
+
+
+<script>
+	
+	
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage')
+	import {WxcLoading,WxcDialog} from 'weex-ui';
+	import Navhearder from '../_mods/navhearder.nvue';
+	import loadingmore from '../_mods/loading-more.nvue';
+	import listItem from "./components/list-item.nvue";
+	import scrollerComponent from '../_mods/scroller.nvue';
+	import addComponent from "./components/add.nvue";
+	import queryComponent from "./components/query.nvue";
+	
+	
+	
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	import * as _ from '../../common/lodash.min.js';
+	import {
+    	lossregisterstore
+	} from "../../common/api.js";
+	  
+
+		
+	export default {
+		mixins: [myMixin],
+		components: { Navhearder,WxcLoading,loadingmore,listItem,scrollerComponent,WxcDialog,addComponent,queryComponent},
+		data() {
+			return {
+				buttonList:['查询','登记'],
+				deptSelect:false,
+				dept:'',
+				addList:[],
+				deptlist:[], 
+				kslist:[],
+				deptId:'',
+				activeIndex:0,
+				showadd:false,
+				updateitem:null,
+				
+				
+				
+				
+				
+				
+				tmid:'',
+				resonSelect:false,
+				resonList:[],
+				reson:{name:'请选择失效原因'},
+				faliureList:[],
+				showdialog:false,
+				messagecontent:'',
+				
+				
+				loadingType:2,
+				loading:false,
+				
+				loginForm:{},
+				page:1,
+				pageSize:20
+			}
+		},
+	
+		created() {
+			this.setbarheight();
+			storage.getItem('loginForm', event => {
+			    this.loginForm = JSON.parse(event.data);
+			})
+			storage.getItem('deptlist', event => {
+			  this.deptlist=JSON.parse(event.data);
+			})
+		},
+			
+		methods: {
+			showadditem(item){
+				this.updateitem=item;
+				this.showadd=true;
+			},
+			oncloseAdd(item){
+			   this.showadd=false;
+			   if(!item){
+				   return;
+			   }
+			   let updateitemIndex=_.findIndex(this.addList,{id:item.id});
+			    console.log('updateitemIndex')
+			   console.log(updateitemIndex)
+			   if(updateitemIndex!=-1){
+				   this.addList[updateitemIndex]=item;
+				   return;
+			   }
+			   this.addList.push(item);
+			},
+			stepClick(index){
+				this.activeIndex=-1;
+				setTimeout(()=>{this.activeIndex=index;},1)
+			},
+			onChoosedept(item) {
+				this.deptSelect = false;
+				if (item != null && this.deptId == item.de_deptid) {
+					return;
+				}
+				this.dept=item.de_deptname;
+				this.deptId= item.de_deptid;
+				
+				// this.getToreclaim();
+			},
+			onsearchdept(e){
+				this.deptSelect=true;
+				this.deptId='';
+				this.searchList(e.value);  
+			},
+			searchList(e) {
+			
+				this.searchDeptsthrottle(e, this.deptlist).then(res => {
+					this.kslist = res;
+				}).catch((e)=>{
+					
+				})
+			},
+			add(){
+				this.updateitem=null;
+				this.showadd=true;
+			},
+			store(){
+				if(!this.deptId){
+					modal.toast({message: '请选择科室!'});
+					return;
+				}
+				if(!this.addList.length){
+					modal.toast({message: '请添加损耗明细!'});
+					return;
+				}
+				const data={"Sh":{"sh_did":this.deptId,"sh_dname":this.dept},"ShDtl":{"shList":this.addList},"LoginForm":this.loginForm};
+				lossregisterstore(data).then(res=>{
+					console.log('store');
+					console.log(JSON.stringify(res));
+					if(res.status=="OK"){
+						modal.toast({message: '保存成功'});
+						this.addList=[];
+					}
+					if(res.status=="error"){
+						modal.toast({message: res.message});
+					}
+				})
+			},
+			showSelect(name) {
+				if (name != "resonSelect") {
+					this.resonSelect = false;
+				}
+				setTimeout(() => {
+					this[name] = !this[name];
+				}, 20)
+			
+			},
+		
+
+
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style scoped>
+	  .same-button{
+		   font-size:45px;
+		   text-align: center;
+		   color:white;
+		   height:90px;
+		   line-height:90px;
+		   background-color: #0080FF;
+	}
+	  .bottom-button{
+		   width:750px;
+		   height:90px;
+		   flex-direction: row;
+	}
+
+	.maincontent {
+		display: flex;
+		flex: 1;
+		width: 750px;
+		flex-direction: column;
+	}
+	.home-content{
+		/* background-color: red; */
+		flex:1;
+		width:750px;
+		position:relative;
+	}
+	.border-bottom{
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+	.input-row{
+		height:90px;
+		width:750px;
+		padding:0 25px;
+	}
+
+  .main-list{
+	 
+	 flex:1;
+   }
+ 
+  
+</style>
+
+

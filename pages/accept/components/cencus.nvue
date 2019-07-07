@@ -1,0 +1,200 @@
+<template>
+	<view style="flex:1" @click="closeSelect">
+		  
+			<view class="input-row flexbetween border-bottom">
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="startTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('start')" placeholder="日期" />
+            <image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="endTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('end')" placeholder="日期" />
+             <image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+			</view>
+			<view class="flexaround input-row border-bottom" style="align-items: center;">
+				<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="bid" placeholder="请输入包拼音码" @input="onsearchpack($event.value)"></input>
+				<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+			 </view>
+			<view class="main-list" style="flex:1;width:750px;">
+				<scroller class="scroller" @loadmore="scrolltoBottom" :loadmoreoffset="20">
+					<cencusItem v-for="(item,index) in list" @detail="showdetail" :item="item" ></cencusItem>	
+					<!-- <loadingmore v-if="todayReclaimList.length" :loadingType="loadingType"></loadingmore> -->
+				</scroller>
+			</view>
+		 <scrollerComponent 
+		 :listshow="packSelect"
+		  @chose="onChoosepack"  
+		  :width="'450'" 
+		  :height="'400'" 
+		  :left="'20'" 
+		  :top="'170'" 
+		  :dataList="packlist" 
+		  :lable="'bmc'"></scrollerComponent> 
+		   <wxc-loading :show="loading"></wxc-loading>		
+		
+		<!--  <cencusDetail v-if="showdetailitem" :startTime="startTime" :endTime="endTime" @closeDetail="showdetailitem=false" :item="activeitem"></cencusDetail> -->
+	</view>
+</template>
+
+<script>
+	import scrollerComponent from '../../_mods/scroller.nvue';
+	// import cencusDetail from "./cencus-detail.nvue";
+	// import loadingmore from '../../_mods/loading-more.nvue';
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {formatDate} from "../../../common/tool.js";
+	import cencusItem from "./cencus-item.nvue";
+	import * as _ from '../../../common/lodash.min.js';
+	import {WxcLoading} from 'weex-ui';
+	import {
+		searchPacknvue,getaceptcencus
+	} from "../../../common/api.js";
+	import {
+		myMixin
+	} from "../../../common/mixins.js";
+	import {
+		datewarnmixins
+	} from "../../../common/datewarnmixins.js";
+	
+	export default {
+		props:{'todayReclaimNum':String},
+		mixins: [myMixin,datewarnmixins],
+		components: {scrollerComponent,cencusItem,WxcLoading},
+	
+		data() {
+			return {
+				timer:'',
+				packlist:[],
+				bid:'',
+				packId:'',
+				packSelect:false,
+				page:1,
+				pageSize:20,
+				loading:false,
+				startTime:formatDate(new Date(),"yyyy-MM-dd"),
+				endTime:formatDate(new Date(),"yyyy-MM-dd"),
+// 				showdetailitem:false,
+// 				activeitem:{},
+
+				
+				list: [],
+				loadingType:2,
+			
+			
+			
+		
+	
+				
+				
+
+				
+			
+				
+			   
+// 				startDt:'',
+// 				endDt:'',
+				
+				// initTime:formatDate(new Date(),"yyyy-MM-dd"),
+				
+			}
+		},
+		created(){
+			this.getsystime().then(res=>{
+				this.startTime=res.slice(0,11);
+				this.endTime=res.slice(0,11);
+			})
+			storage.getItem('loginForm', event => {
+			  this.loginForm = JSON.parse(event.data);
+			 this.getaceptcencus();
+			
+			})
+			storage.getItem('deptlist', event => {
+			  this.deptlist=JSON.parse(event.data);
+			})
+		},
+		methods:{
+			showdetail(item){
+				this.$emit('showdetail',{startTime:this. startTime, endTime:this.endTime,bid:item.bid})
+			},
+			onChoosepack(item){
+				this.packSelect=false;
+				this.bid=item.bmc;
+				this.packId=item.bid;
+				this.initdata()
+				this.getaceptcencus();
+			},
+			onsearchpack(e){
+				this.packId='';
+				clearTimeout(this.timer)
+				this.packSelect=true;
+				this.timer=setTimeout(()=>{
+					const data={"Bpzgl":{"py_code":e},"PageReq":{"page":"1","rows":"10"},"LoginForm":this.loginForm};
+					searchPacknvue(data).then(res=>{
+						console.log(res,'搜索包');
+						 if(res.errorCode=="0"){
+							this.packlist=res.returnValue.rows;
+							 // Vue.set(this.washList,itemIndex,res.returnValue.qxjStateList[0]);
+						}
+					})
+				},300)
+				
+			},
+			getaceptcencus(){
+				this.loading=true;
+				const data={"Tmxx":{"bnrList":[],"end_dt_js":this.endTime,"isChecked":false,"jsList":[],"start_dt_js":this.startTime,"zjFfList":[],"bid":this.packId,"js_did":this.loginForm.deptId},"PageReq":{"page":this.page,"rows":this.pageSize},"LoginForm":this.loginForm};
+			    console.log('getaceptcencusdata')
+				 console.log(JSON.stringify(data));
+				getaceptcencus(data).then(res=>{
+					this.loading=false;
+					console.log('getaceptcencus');
+					console.log(JSON.stringify(res))
+					 if(res.errorCode=="0"){
+						 if(res.returnValue.rows.length==0){
+							 modal.toast({message:"未查询到相关记录!"})
+							 return;
+						 }
+						 this.list=res.returnValue.rows
+						// this.packlist=res.returnValue.rows;
+						 // Vue.set(this.washList,itemIndex,res.returnValue.qxjStateList[0]);
+					}
+				})
+			},
+
+			datechange(timestate){
+				
+				if(this.warningdate({'start':this.startTime,'end':this.endTime})){
+					timestate=='end'?modal.toast({message:'结束时间不得小于开始时间！'}):modal.toast({message:'开始时间不得大于结束时间！'});
+					return;
+				}
+				this.initdata()
+				this.getaceptcencus();
+			},
+			closeSelect(){
+				this.packSelect=false;
+			},
+			showSelect(name) {
+				if (name != "packSelect") {
+					this.packSelect = false;
+				}
+				setTimeout(() => {
+					this[name] = !this[name];
+				}, 20)
+			
+			},
+
+			initdata(){
+				this.page=1;
+				this.list=[];
+				
+			}
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+<style scoped>
+	.cencus-font{
+		font-size: 80px;
+			color: #FFA613;
+	}
+
+</style>

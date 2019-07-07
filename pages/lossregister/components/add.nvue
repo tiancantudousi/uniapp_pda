@@ -1,0 +1,333 @@
+<template>
+	<view style="width:750px;position:absolute;top:0;left:0;background-color: white;" :style="{height:mainContentHeight+'wx'}" @click="closeall">
+		<view class="head border-bottom">
+			<text style="font-size:35px;" @click="closeAdd(false)">取消</text>
+			<!-- <text style="font-size:35px;" @click="closeAdd">确认</text> -->
+			<wxc-button text="确定" type="blue" :btn-style="{width:'120px',height:'60px'}" :text-style="{fontSize:'30px',color:'white'}" @wxcButtonClicked="closeAdd(true)"></wxc-button>
+
+		</view>
+		<view class="input-row border-bottom" style="align-items: center;">
+		    <input style="height:60px;flex:1;margin-left:70px;width:720px;" type="text" v-model="tmid" placeholder="请录入包条码" return-key-type="search" @return="enter()"></input>
+			
+		</view>
+		<view class="flexaround input-row border-bottom aligncenter" @click="showSelect('packSelect')">			
+				<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="bid" :disabled="disabledpack" placeholder="请输入包拼音码" @input="onsearchpack($event.value)"></input>
+				<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+		</view>
+		<view class="flexaround input-row border-bottom aligncenter" @click="showSelect('materialSelect')">
+				<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="material" placeholder="请输入材料拼音码" @blur="checkmaterial" @input="onsearchmaterial($event.value)"></input>
+				<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+		</view>
+		<view class="flexaround input-row border-bottom aligncenter" >
+				<input style="height:60px;flex:1;margin-left:30px;" type="number" placeholder="请输入损耗数量" v-model="materialNum" ></input>
+				
+		</view>
+		<view class="flexaround input-row border-bottom aligncenter" >
+				<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="price" placeholder="请录入价格" ></input>
+				
+		</view>
+		<view class="flexaround input-row border-bottom aligncenter" @click="showSelect('losstypeSelect')">
+			
+				<!-- <input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="losstype" placeholder="请选择损耗类型"></input> -->
+				<text style="flex:1;font-size:30px;margin-left:30px;color:gray">{{losstype.aaa101}}</text>
+				<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+		</view>
+		<view class="flexaround input-row border-bottom aligncenter" >
+				<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="mark" placeholder="请录入备注" ></input>
+		</view>
+
+
+        <scrollerComponent :listshow="packSelect" @chose="onChoosepack"  :width="'450'" :height="'400'" :left="'20'" :top="'260'" :dataList="packlist" :lable="'bmc'"></scrollerComponent> 
+		<scrollerComponent :listshow="materialSelect" @chose="onChoosematerial"  :width="'450'" :height="'400'" :left="'20'" :top="'350'" :dataList="materiallist" :lable="'clmc'"></scrollerComponent> 
+		<scrollerComponent :listshow="losstypeSelect" @chose="onChooselosstype"  :width="'450'" :height="'400'" :left="'20'" :top="'620'" :dataList="losstypelist" :lable="'aaa101'"></scrollerComponent> 
+			
+	</view>
+</template>
+
+<script>
+	import {WxcButton} from 'weex-ui';
+	var modal = weex.requireModule('modal');
+	import {
+		searchPacknvue,getlosstypes,getmaterialByBid,getTmxx
+	} from "../../../common/api.js";
+	import {guid} from "../../../common/tool.js";
+	
+		import {
+		myMixin
+	} from "../../../common/mixins.js";
+	import scrollerComponent from '../../_mods/scroller.nvue';
+	const storage = weex.requireModule('storage');
+	let materiallist=[];
+
+	export default {
+		mixins: [myMixin],
+		components: {scrollerComponent,WxcButton},
+		props: ['loginForm','updateitem'],
+	
+	
+		data() {
+			return {
+				tmid:'',
+				packlist:[],
+				packSelect:false,
+				bid:'',
+				packId:'',
+				material:'',
+				materialId:'',
+				materialNum:1,
+				price:'',
+				losstypeSelect:false,
+				losstype:{aaa101:'请选择损耗类型'},
+				mark:'',
+				mainContentHeight:'2000',
+				materiallist:[],
+				losstypelist:[],
+				materialSelect:false,
+				disabledpack:false
+			}
+		},
+		created(){
+			// this.getmaterial();
+			if(this.updateitem){
+				this.initdata(this.updateitem);
+			}
+			this.getmaincontentheight();
+			this.getlosstypes();
+		},
+		methods: {
+			checkmaterial(){
+				if(!this.materialId){
+					this.material='';
+				}
+			},
+			closeall(){
+				this.losstypeSelect=false;
+				this.packSelect=false;
+				this.materialSelect=false;
+			},
+			initdata(item){
+				this.bid=item.bid?item.bmc:'';
+				this.packId=item.bid?item.bid:'';
+				this.losstype=item.sh_type?{aaa102:item.sh_type,aaa101:item.sh_type_name}:{aaa101:'请选择损耗类型'};
+				this.tmid=item.tmid?item.tmid:'';
+				this.materialNum=item.sh_num==''?'':item.sh_num;
+				this.price=item.sh_pc?item.sh_pc:'';
+				this.mark=item.remark?item.remark:'';
+				this.materialId=item.clid?item.clid:'';
+				this.material=item.clid?item.clmc:'';
+					
+			},
+			enter(){
+				const data={"Tmxx":{"bnrList":[],"isChecked":false,"jsList":[],"zjFfList":[],"tmid":this.tmid},"LoginForm":this.loginForm};
+				getTmxx(data).then(res=>{
+					console.log('条码');
+					console.log(JSON.stringify(res));
+					if(res.status=="OK"){
+						this.disabledpack=true;
+						let item=res.returnValue.Tmxx;
+						this.onChoosepack(item);
+					}
+				})
+			},
+			onChoosematerial(item){
+				this.materialSelect=false;
+				this.material=item.clmc;
+				this.materialId=item.clid;
+			},
+			onChooselosstype(item){
+				this.losstypeSelect=false;
+				this.losstype=item;
+			},
+			getmaterialByBid(){
+				if(!this.packId){
+					 modal.toast({message: "请选择包"});
+						 return;
+				}
+				const data={"Cl":{"bid":this.packId,"clList":[],"is_inv":"1"}};
+				getmaterialByBid(data).then(res=>{
+					console.log('材料');
+					console.log(JSON.stringify(res));
+					if(res.status=="OK"){
+						materiallist=res.returnValue.cllist;
+						this.materiallist=res.returnValue.cllist;
+						// this.onsearchmaterial('');
+					}
+				})
+			},
+			onsearchmaterial(value) {
+				this.materialSelect=true;
+				this.materialId='';
+				this.searchthrottle(value,materiallist,'clmc','py_code').then(res => {
+					this.materiallist = res;
+				}).catch((e)=>{
+					console.log(e);
+				})
+			},
+			getlosstypes(){
+				const data={"AA10":{"aaa100":"SH_TYPE"},"LoginForm":this.loginForm};
+				getlosstypes(data).then(res=>{
+					console.log('损耗类型');
+					console.log(JSON.stringify(res));
+					if(res.status=="OK"){
+						this.losstypelist=res.returnValue.AA10List.map(item=>{
+							return {aaa101:item.aaa101,aaa102:item.aaa102}
+						})
+					}
+				})
+			},
+		
+			showSelect(name) {
+				if(this.disabledpack&&name=="packSelect"){
+					return;
+				}
+				if (name != "packSelect") {
+					this.packSelect = false;
+				}
+				if (name != "materialSelect") {
+					this.materialSelect = false;
+				}
+				if (name != "losstypeSelect") {
+					this.losstypeSelect = false;
+				}
+				setTimeout(() => {
+					this[name] = !this[name];
+				}, 20)
+			
+			},
+			onChoosepack(item){
+				this.packSelect=false;
+				this.bid=item.bmc;
+				this.packId=item.bid;
+				this.getmaterialByBid();
+			},
+			onsearchpack(e){
+				this.packId='';
+				clearTimeout(this.timer)
+				this.packSelect=true;
+				this.timer=setTimeout(()=>{
+					const data={"Bpzgl":{"py_code":e},"PageReq":{"page":"1","rows":"10"},"LoginForm":this.loginForm};
+					searchPacknvue(data).then(res=>{
+						console.log(res,'搜索包');
+						 if(res.errorCode=="0"){
+							this.packlist=res.returnValue.rows;
+							 // Vue.set(this.washList,itemIndex,res.returnValue.qxjStateList[0]);
+						}
+					})
+				},300)
+				
+			},
+			async getmaincontentheight(){
+				this.mainContentHeight=await this.getmainContentHeight();
+			},
+			closeAdd(flag){
+				if(flag){
+					// {"clid":"1","clmc":"内植钉","sh_type":"1"}
+					if(!this.materialNum||this.materialNum==0 ){
+						modal.toast({message: '材料数据不能为空或0'});
+						return;
+					}
+					if(!this.packId){
+						modal.toast({message: '请选择包'});
+						return;
+					}
+					if(!this.losstype.aaa102){
+						modal.toast({message: '请选择损耗类型'});
+						return;
+					}
+					let item={"shList":[],
+					bmc:this.packId?this.bid:'',
+					bid:this.packId,
+					"sh_type":this.losstype.aaa102,
+					"sh_type_name":this.losstype.aaa101,
+					tmid:this.tmid,
+					"sh_num":this.materialNum,
+					"sh_pc":this.price,
+					"remark":this.mark,
+					"clid":this.materialId,"clmc":this.materialId?this.material:'',
+					id:this.updateitem?this.updateitem.id:guid()
+					};
+					console.log('item');
+					console.log(JSON.stringify(item));
+					this.$emit('closeAdd',item);
+				}else{
+					this.$emit('closeAdd',null);
+				}
+				
+			},
+
+		},
+		mounted(){
+					
+		},
+		destroyed(){
+// 			materiallist=[];
+// 			this.packId='';
+// 			this.tmid='';
+// 			this.materialNum=1;
+// 			this.price='';
+// 			this.mark='';
+// 			this.materialId="";
+// 			this.material='';
+// 			this.disabledpack=false;
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+
+<style scoped>
+	.aligncenter{
+		align-items: center;
+	}
+	.head {
+		height:90px;
+		
+		padding: 0 30px 0 30px;;
+		position: relative;
+		flex: none;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+	.close-img {
+		width: 40px;
+		height: 40px;
+	}
+	.mainimg {
+		width: 750px;
+		position: relative;
+	}
+	.tip {
+		position: absolute;
+		left: 0;
+		top: 30px;
+		background-color: rgba(0, 0, 0, 0.5);
+		color: white;
+		font-size: 33px;
+	    padding:10px;
+		border-radius:5px;
+	}
+	.detail-content {
+		flex: 1;
+	}
+	.detail-item {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 20px 30px 20px 30px;
+	}
+	.detail-index {
+		font-size: 35px;
+		color: #A5A5A5;
+	}
+	.detail-name {
+		padding-left:30px;
+		flex: 1;
+		font-size: 38px;
+		color: #333333;
+	}
+	.detail-num {
+		font-size: 40px;
+		color: #0080FF;
+	}
+
+</style>

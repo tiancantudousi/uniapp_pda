@@ -1,0 +1,264 @@
+<template>
+	<view style="flex:1" @click="closeSelect">
+	
+				
+			<view class="flexbetween border-bottom" style="height:200px;width:750px;padding-top:10px;padding-bottom:10px;">	
+				<view  style="flex:1;justify-content: center;align-items: center;">
+					<text class="cencus-font">{{historycensusNum}}</text>
+					<text style="font-size:30px;">发放总数</text>
+				</view>
+			</view>
+			<view class="flexaround input-row  border-bottom" style="justify-content: center;">
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="startTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('start')" placeholder="日期" />
+				        <image  src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="endTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('end')" placeholder="日期" />
+						<image  src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+			</view>
+			
+			<view class="input-row border-bottom" style="flex-direction: row;align-items: center;">
+				
+					<view class="flexaround paddingimage" style="flex:1;" @click="showSelect('deptSelect')"> 
+						<input style="height:60px;flex:1;" type="text" @focus="showSelect('deptSelect')" v-model="dept" placeholder="请选择科室" @input="onsearchdept($event)"></input>
+					    <image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+			
+			         <view class="flexaround paddingimage" style="flex:1;" @click="showSelect('packSelect')">			
+			        		<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="bid"  placeholder="请输入包拼音码" return-key-type="search"   @input="onsearchpack($event.value)"></input>
+			        		<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+			        </view>
+			</view>
+			
+			
+			
+	       
+			<view style="flex:1;">
+				<scroller class="scroller" @loadmore="scrolltoBottom" :loadmoreoffset="20">
+				    <view style="position:relative;padding-left:20px;padding-right:20px;padding-top:10px;padding-bottom:10px;" class="border-bottom" @click="showdetail(item)" v-for="(item,index) in provideList" :key="index">
+			            <text style="font-size:35px;">{{item.ff_dname}}</text>
+						<text style="font-size:35px;">{{item.bmc}}</text>
+						<view style="flex-direction: row;align-items: center;">
+							 <text style="text-align: center;font-size:35px;">基数:{{item.jsff_num}}</text>  
+							 <view style="margin:10px;"></view>
+							<text style="text-align: center;font-size:35px;">借包:{{item.jbff_num}}</text>
+							<view style="margin:10px;"></view>
+							<text style="text-align: center;font-size:35px;">直接:{{item.zjff_num}}</text>
+						</view>
+						<image src="../../static/img/i-right.png" style="width:10px;height:20px;position:absolute;top:50;right:10px;" alt=""></image>
+				     </view>
+					<loadingmore v-if="provideList.length" :loadingType="loadingType"></loadingmore>
+				</scroller>
+			</view>
+				<scrollerComponent :showpleaseSlect="true" :listshow="deptSelect" @chose="onChoosedept" :width="'420'" :height="'350'"
+			 :left="'20'" :top="'370'" :dataList="kslist" :lable="'de_deptname'"></scrollerComponent>
+			  <scrollerComponent  :listshow="packSelect" @chose="onChoosepack"  :width="'450'" :height="'400'" :left="'280'" :top="'370'" :dataList="packlist" :lable="'bmc'"></scrollerComponent> 
+			
+				<wxc-loading :show="loading"></wxc-loading>	
+		
+	
+	</view>
+</template>
+
+<script>
+	import scrollerComponent from '../../_mods/scroller.nvue';
+	 import loadingmore from '../../_mods/loading-more.nvue';
+		import { WxcLoading} from 'weex-ui';
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {formatDate} from "../../../common/tool.js";
+	import {
+		datewarnmixins
+	} from "../../../common/datewarnmixins.js";
+	import * as _ from '../../../common/lodash.min.js';
+	import {
+		searchPacknvue,getprovidecensus
+	} from "../../../common/api.js";
+	import {
+		myMixin
+	} from "../../../common/mixins.js";
+	
+	export default {
+		
+		mixins: [myMixin,datewarnmixins],
+		components: {scrollerComponent,WxcLoading,loadingmore},
+	
+		data() {
+			return {
+				historycensusNum:0,
+				startTime:'',
+				endTime:'',
+				deptSelect:false,
+				dept:'',
+				deptId:'',
+				kslist:[],
+				packSelect:false,
+				bid:'',
+				timer:'',
+				provideList:[],
+				page:1,
+				pageSize:20,
+				loginForm:{},
+				packId:'',
+				loadingType:'0',
+				packlist:[]
+				
+			}
+		},
+		created(){
+	        this.getsystime().then(res=>{
+				this.startTime=res.slice(0,11);
+				this.endTime=res.slice(0,11);
+				storage.getItem('loginForm', event => {
+				  this.loginForm = JSON.parse(event.data);
+// 				  this.getshelves();
+// 				  this.groundingcencus();
+				
+				})
+			})
+			storage.getItem('deptlist', event => {
+				this.deptlist = JSON.parse(event.data);
+				this.searchList('');
+			})
+		},
+		methods:{
+			showdetail(item){
+				this.$emit('showdetail',{...item,startTime:this.startTime,endTime:this.endTime})
+			},
+			closeSelect(){
+				this.packSelect=false;
+				this.deptSelect = false;
+			},
+			showSelect(name) {
+				if (name != "packSelect") {
+					this.packSelect = false;
+				}
+				if (name != "deptSelect") {
+					this.deptSelect = false;
+				}
+		
+				setTimeout(() => {
+					this[name] = !this[name];
+				}, 20)
+			
+			},
+			onChoosepack(item){
+				this.packSelect=false;
+				this.packId=item.bid;
+				this.bid=item.bmc;
+				this.initgetprovidecensus();
+			},
+			onChoosedept(item) {
+				this.deptSelect = false;
+				
+				this.dept = item.de_deptname;
+				this.deptId = item.de_deptid;
+	            this.initgetprovidecensus();
+				
+			},
+			initgetprovidecensus(){
+				this.page=1;
+				this.provideList=[];
+				this.getprovidecensus();
+			},
+			onsearchpack(e){
+				this.packId='';
+				clearTimeout(this.timer)
+				this.packSelect=true;
+				this.timer=setTimeout(()=>{
+					const data={"Bpzgl":{"py_code":e},"PageReq":{"page":"1","rows":"10"},"LoginForm":this.loginForm};
+					searchPacknvue(data).then(res=>{
+						console.log(res,'搜索包');
+						if(res.errorCode=="0"){
+							this.packlist=res.returnValue.rows;
+						}
+					})
+				},300)
+				
+			},
+			onsearchdept(e) {
+				this.deptSelect = true;
+				this.searchList(e.value);
+			},
+			searchList(e) {
+
+			
+				this.searchDeptsthrottle(e, this.deptlist).then(res => {
+					console.log(JSON.stringify(res));
+					this.kslist = res;
+				}).catch((e) => {
+					console.log(e);
+				})
+			},
+			
+			
+			getprovidecensus() {
+				this.provideList=[];
+				const data = {
+					"Tmxx": {
+						"bnrList": [],
+						"end_dt_ff": this.endTime.trim() + " 23:59:59",
+						"isChecked": false,
+						"jsList": [],
+						"start_dt_ff": this.startTime.trim() + " 00:00:00",
+						"zjFfList": [],
+						"bid": this.packId,
+						"ff_did": this.deptId
+					},
+					"PageReq": {"page":this.page,"rows":this.pageSize},
+					"LoginForm": this.loginForm
+				};
+					
+				getprovidecensus(data).then(res => {
+					console.log(res,data,'统计数据');
+					if (res.status == "OK") {
+						this.historycensusNum=res.returnValue.zsl;
+						if(this.page==1&&!res.returnValue.rows.length){
+							 modal.toast({message:'未查询到相关记录!'})
+							return;
+						}
+						let tempres=res.returnValue.rows.map(item => {
+							return {
+								jsff_num: item.jsff_num,
+								ff_dname: item.ff_dname,
+								bmc: item.bmc,
+								jbff_num: item.jbff_num,
+								zjff_num: item.zjff_num,
+								 bid:item. bid,
+								   ff_did:item.ff_did
+							};
+						})
+						this.provideList =this.provideList.concat(tempres);
+					}
+				})
+			},
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			datechange(timestate){
+				
+				if(this.warningdate({'start':this.startTime,'end':this.endTime})){
+					timestate=='end'?modal.toast({message:'结束时间不得小于开始时间！'}):modal.toast({message:'开始时间不得大于结束时间！'});
+					return;
+				}
+			    this.initgetprovidecensus();
+			},
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+<style scoped>
+	.cencus-font{
+		font-size: 80px;
+			color: #FFA613;
+	}
+
+</style>

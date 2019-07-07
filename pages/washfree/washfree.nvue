@@ -1,0 +1,499 @@
+<template>
+	<view class="maincontent">
+		<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+		<view class="home-content" style="position:relative;">
+			<!-- 单独header组件 -->
+			<navhearder @stepClick="" :buttonList="[activeMachine.dev_name]" :loginForm="loginForm"></navhearder>
+			<text v-if="selfdetailList.length" style="position:absolute;top:-25px;right:25px;font-size:40px;color:white" @click.stop="showpotChange=true"> 
+				换锅
+			</text>
+			<view class="flexbetween input-row border-bottom"> 
+			    <text class="samesize">日锅次:{{activeMachine.d_gc}}</text>
+				<text class="samesize">总锅次:{{activeMachine.t_gc}}</text>
+				 <view class="flexaround paddingimage" style="width:375px;" @click="showSelect('packSelect')">			
+						<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="bid"  placeholder="请输入包拼音码" return-key-type="search"  @return="onpackEnter($event.value)" @input="onsearchpack($event.value)"></input>
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+				</view>
+			</view>
+			<view class="flexaround input-row border-bottom"> 
+			    <text class="samesize">开始时间:</text>
+				<input v-model="startDate"  style="height:60px;flex:1;" class="input" type="date" placeholder="日期" /> 
+				<input v-model="startTime"  style="height:60px;flex:1;" class="input" type="time" placeholder="时间" />
+			</view>
+			<view class="program"  v-if="programList.length">
+				<view class="program-item" style="justify-content: center;align-items: center;" :class="[index==activeindex?'activeprogram':'']" v-for="(item,index) in programList"   @click.stop="choseprogram(index)" :key="index">
+					<text style="font-size:35px" :class="[index==activeindex?'colorwhite':'colorblack']" >{{item.aaa103}}</text> 
+					<text style="font-size:35px" class="bottom-text" :class="[index==activeindex?'colorwhite':'colorblack']" >{{item.aaa106}}分</text>
+				</view>
+			</view>
+			<view class="split"></view>
+
+
+			<scroller class="scroller" style="flex:1;width:750px;">
+					<scrollListItem  v-if="selfdetailList.length" v-for="(item,index) in selfdetailList" :key="index" :item="item"></scrollListItem>
+			</scroller>
+			<view class="one-button flexcenter" v-if="selfdetailList.length&&machineState!='update'" @click.stop="startwash">
+			   
+				<text class="same-button" style="flex:1;width:750px;">开始清洗({{packTotal}})</text>
+			</view>
+			<view class="one-button flexcenter" v-if="machineState=='update'" @click="update">
+			   
+				<text class="same-button" style="flex:1;width:750px;">确认修改</text>
+			</view>
+	<!-- 		<view class="start-wash flexcenter" v-if="selfdetailList.length&&machineState!='update'" @click.stop="startwash">
+				开始清洗({{packTotal}})
+			</view>
+			<view class="start-wash flexcenter" v-if="machineState=='update'" @click.stop="update">
+				确认修改
+			</view> -->
+			<view class="washfree-main-noplate" v-if="!selfdetailList.length">
+       <image style="height:211px;width:200px;" src="../../static/img/image-plate.png" alt=""></image>	
+					<text class="noplate-text">请扫描清洗盘条码</text>
+			</view>		
+			 <scrollerComponent v-if="machineState!='update'" :listshow="packSelect" @chose="onChoosepack"  :width="'450'" :height="'400'" :left="'280'" :top="'240'" :dataList="packlist" :lable="'bmc'"></scrollerComponent> 
+			 <potchange v-if="showpotChange" @onClosetemp="showpotChange=false" :washstate="'prepare'"></potchange>
+
+
+
+		</view>
+		<!-- 		<wxc-dialog :title="'包条码：'+tmid"
+		            :content="messagecontent"
+		            :show="showdialog"
+		            @wxcDialogCancelBtnClicked="showdialog=false"
+		            @wxcDialogConfirmBtnClicked="dialogConfirmBtnClick"
+		          ></wxc-dialog> -->
+		<wxc-loading :show="loading"></wxc-loading>
+
+	</view>
+</template>
+
+
+<script>
+	let timer;
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {
+		WxcLoading,
+		WxcDialog
+	} from 'weex-ui';
+	import Navhearder from '../_mods/navhearder.nvue';
+	// import loadingmore from '../_mods/loading-more.nvue';
+	import scrollerComponent from '../_mods/scroller.nvue';
+	import scrollListItem from '../_mods/wash-scroll-item.nvue';
+	import potchange from '../wash/components/potchange.nvue';
+	import {formatDate} from "../../common/tool.js";
+	
+	// import reclaimDetail from "../reclaim/components/reclaim-detail.nvue";
+
+
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	import * as _ from '../../common/lodash.min.js';
+	import {
+		publicSelect,
+		searchPacknvue,
+		addpack,
+		startwash,
+		update,
+		getSystemTime
+		
+	} from "../../common/api.js";
+
+
+
+	export default {
+		mixins: [myMixin],
+		components: {
+			Navhearder,
+			WxcLoading,
+			scrollListItem,
+			scrollerComponent,
+			potchange
+		},
+		data() {
+			return {
+				washList:[],
+				packSelect:false,
+				bid:'',
+				packId:'',
+				timer:'',
+				packlist:[],
+				startDate:'', 
+				startTime:'',
+				programList:[],
+				machineState:'',
+				activeMachine:{},
+				updateProId:'',
+				packTotal:0,
+				selfdetailList:[],
+				showpotChange:false,
+				activeindex:-1,
+				
+// 				loadingType:2,
+// 				page:1,
+// 				pageSize:20,
+				loading: false,
+
+				loginForm: {},
+			}
+		},
+
+		created() {
+			this.setbarheight();
+           
+			this.linsentBarCode(this.judgeScanType)
+			this.getsystime().then(res=>{
+				console.log(res);
+				this.startDate=res.slice(0,11);
+				this.startTime=res.slice(11,16);
+			});
+			storage.getItem('washdetailList', event => {
+				console.log('washdetailList')
+				console.log(event.data)
+				this.selfdetailList = JSON.parse(event.data);
+				this.countpackTotal();
+			})
+			storage.getItem('activeWashmachine', event => {
+				console.log('activeWashmachine')
+				console.log(event.data)
+				this.activeMachine = JSON.parse(event.data);
+				 storage.getItem('potionid', event => {
+					 if(event.data=="update"){
+						  this.machineState=event.data;
+						  this.updateProId=this.activeMachine.proc_id;
+						 
+					}
+				})
+			})
+			
+			storage.getItem('loginForm', event => {
+				this.loginForm = JSON.parse(event.data);
+				this.getwashProgram();
+			    // this.selfdetailList=clone(this.detailList);
+			    
+			})
+		},
+  
+		methods: {
+// 			onChoosepack(item){
+// 				this.packSelect=false;
+// 				this.bid=item.bmc;
+// 				this.packId=item.bid;
+// 				// this.addpacklist.push();
+// 				// this.getmaterialByBid();
+// 			},
+			onsearchpack(e){
+				this.packId='';
+				clearTimeout(this.timer)
+				this.packSelect=true;
+				this.timer=setTimeout(()=>{
+					const data={"Bpzgl":{"py_code":e},"PageReq":{"page":"1","rows":"10"},"LoginForm":this.loginForm};
+					searchPacknvue(data).then(res=>{
+						console.log(res,'搜索包');
+						if(res.errorCode=="0"){
+							this.packlist=res.returnValue.rows;
+							 // Vue.set(this.washList,itemIndex,res.returnValue.qxjStateList[0]);
+						}
+					})
+				},300)
+				
+			},
+			onpackEnter(packvalue){
+				setTimeout(()=>{
+					// console.log(this.packlist,'this.packlist');
+					let tempitem=this.packlist.find(item=>{
+						return item.bmc==packvalue
+					})
+					if(tempitem){
+						this.onChoosepack(tempitem);
+					}else{
+						// this.clearpack=!this.clearpack;''
+						this.bid='';
+						modal.toast({message: '该包不存在或已失效'});
+					}
+					
+				},500);
+			},
+			
+				/*清洗enter事件功能区域*/
+			judgeScanType(data){
+				let reg=new RegExp('^(BB|bb)');
+				if(reg.test(data)){//包扫码
+					let bid = data.slice(2,data.length);
+					this.onChoosepack({bid:bid});
+				}		
+			},
+			showSelect(name){
+				if(name!="packSelect"){
+					this.packSelect=false;
+				}
+				
+				setTimeout(()=>{
+					this[name]=!this[name];
+				},20)
+			},
+			async update(){
+				this.loading=true;
+			
+				const datatime={"LoginForm":this.loginForm};
+				let time=await getSystemTime(datatime);
+			    let sys=time.returnValue.ServerInfo.systemtime;
+				let jgms=this.countjgms(sys,this.activeMachine.start_dt,this.activeMachine.plan_time);
+				const data={"Qx":
+				
+				{"did":this.loginForm.deptId,
+				"jgms":jgms,
+				"sb_type":this.activeMachine.sb_type,
+				"state":this.activeMachine.state,
+				"state_name":this.activeMachine.state_name,
+				"d_gc":this.activeMachine.d_gc,
+				"dev_id":this.activeMachine.dev_id,
+				"dev_name":this.activeMachine.dev_name,
+				"end_dt":this.activeMachine.end_dt,
+				"id":this.activeMachine.id,
+				"mod_uid":this.loginForm.userId,
+				"mod_uname":this.loginForm.userName,
+				"plan_time":this.programList[this.activeindex].aaa106,
+				"proc_id":this.programList[this.activeindex].aaa102,
+				"proc_name":this.programList[this.activeindex].aaa103,
+				"start_dt":this.activeMachine.start_dt,
+				"t_gc":this.activeMachine.t_gc},"LoginForm":this.loginForm};
+				update(data).then(res=>{
+					this.loading=false;
+					if(res.errorCode=="0"){
+						 uni.postMessage({key: "updatewashmachine",value:this.activeMachine});
+						// this.$bus.emit('refreshItem',this.activeMachine);
+						uni.navigateBack({
+							delta: 2
+						});
+						
+					}
+				}).catch((error)=>{this.loading=false;})
+				
+			},
+			countjgms(sys,start,plan){
+				start = start.replace(new RegExp("-","gm"),"/");
+				sys=sys.replace(new RegExp("-","gm"),"/");
+				
+				let leftTime =Number(plan)*60*1000-((new Date(sys)).getTime()-(new Date(start)).getTime()); //得到毫秒数
+				return Math.floor(leftTime/1000);
+			},
+			choseprogram(index){
+				console.log(index);
+				this.activeindex=index;
+			},
+			startwash(){
+				// console.log(this.activeMachine);
+				if(this.activeindex==-1){
+					modal.toast({message: "请选择清洗程序"});
+					return;
+				}
+				this.loading=true;
+				const data={"Qx":{
+					"did":this.loginForm.deptId,
+					"sb_type":this.activeMachine.sb_type,
+					"state":this.activeMachine.state,
+					"state_name":this.activeMachine.state_name,
+					"d_gc":this.activeMachine.d_gc,
+					"dev_id":this.activeMachine.dev_id,
+					"dev_name":this.activeMachine.dev_name,
+					"plan_time":this.programList[this.activeindex].aaa106,
+					"proc_id":this.programList[this.activeindex].aaa102,
+					"proc_name":this.programList[this.activeindex].aaa103,
+					"start_dt":this.startDate+this.startTime+':00', 
+					"t_gc":this.activeMachine.t_gc},"LoginForm":this.loginForm};
+					console.log(this.startDate+' '+this.startTime+':00');
+					console.log('startwash');
+					console.log(JSON.stringify(data));
+					startwash(data).then(res=>{
+						// console.log(res,"开始清洗");
+						this.loading=false;
+						if(res.errorCode=="0"){
+							 uni.postMessage({key: "washmachine",value:this.activeMachine});
+							// this.$bus.emit('refreshItem',this.activeMachine);
+							uni.navigateBack({
+								delta: 1
+							});
+						}else{
+							modal.toast({message: res.message});
+						}
+					}).catch((error)=>{this.loading=false;})
+			},
+			countpackTotal(){//计算包总数
+				this.packTotal=0;
+				if(!this.selfdetailList.length){
+					return;
+				}
+				this.selfdetailList.forEach(item=>{
+					this.packTotal+=Number(item.b_num);
+				})
+			},
+			onChoosepack(item){
+			
+			
+				this.packSelect=false;
+				this.bid=item.bmc;
+				let pack=this.setbNum(item.bid);
+				this.loading=true;
+				const data={"Hsqxdy":{"b_num":pack.b_num,bmc:item.bmc,"isChecked":false,"bid":item.bid,"qx_d_gc":this.activeMachine.d_gc,"qx_dev_id":this.activeMachine.dev_id,"qx_dev_name":this.activeMachine.dev_name,"qx_t_gc":this.activeMachine.t_gc},"LoginForm":this.loginForm};
+			    addpack(data).then(res=>{
+						this.loading=false;
+					console.log('addpack')
+					console.log(JSON.stringify(res));
+					if(res.errorCode=="0"){
+						
+						if(pack.index==null){
+							let temppack=res.returnValue.hsqxdyList.map(element=>{
+								return {bid:element.bid,bmc:element.bmc,checked:element.checked,py_code:'',b_num:1,qx_num:element.cl_num}
+							})
+							this.selfdetailList.unshift(temppack[0]);
+						}else{
+							this.selfdetailList[pack.index].b_num=pack.b_num;
+						}
+						 this.countpackTotal();
+						
+						
+					}
+					if(res.status=="error"){
+						modal.toast({message: res.message});
+					}
+				
+				}).catch((error)=>{this.loading=false;})
+			},
+			setbNum(bid){
+				let ifpack=_.find(this.selfdetailList,{bid:bid});
+				let index=null;
+				if(ifpack&&ifpack.basket_name){//不能给带清洗盘的添加包
+					ifpack=null;
+				}else{
+					index=_.findIndex(this.selfdetailList,ifpack);
+				}
+				return ifpack?{b_num:Number(ifpack.b_num)+1,index:index}:{b_num:1,index:null};
+			},
+			getwashProgram(){
+				const data={"AA10":{"aaa100":"QXCX"},"LoginForm":this.loginForm};
+				publicSelect(data).then(res=>{
+					console.log('getwashProgram');
+					console.log(JSON.stringify(res));
+					 if(res.errorCode=="0"){					
+						this.programList=res.returnValue.AA10List;
+						  if(this.machineState=="update"){
+							 this.activeindex=_.findIndex(this.programList,{aaa102:this.updateProId})
+						  }
+					}
+				})
+			},
+
+
+// 			scrolltoBottom(){
+// 				this.page++;
+// 			    this.loadingType=2;
+// 			},
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style scoped>
+	.colorwhite{
+		color:white;
+		font-size:35px
+	} .colorblack{
+		color:black;
+		font-size:35px
+	}
+		.same-button{
+		   font-size:45px;
+		  /* text-align: center; */
+		   color:white;
+		/*   height:90px;
+		   line-height:90px; */
+		  
+	}
+	.one-button{
+		
+		   background-color: #0080FF;
+		  flex:none;
+		   width:750px;
+		   height:90px;
+		   align-items: center;
+		   justify-content: center;
+		 /*  flex-direction: row; */
+	}
+	.washfree-main-noplate{
+		flex:1;
+		align-items: center;
+		justify-content: center;
+	
+	}
+	.noplate-text{
+		margin-top:50px;
+		font-size: 33px;
+		color: #A5A5A5;
+	}
+	.start-wash{
+		flex:none;
+		background: #0080FF;
+		font-size: 38upx;
+		color: #FFFFFF;
+		height:100px;
+	}
+	.split{
+		background-color: #F3F3F3;
+		height:20px;
+		width:750px;
+		flex:none;
+	}
+    .samesize{
+			font-size:33px;
+			color:#A5A5A5;
+		}
+	.program{
+		display:flex;
+		flex-direction: row;
+		flex:none;
+		justify-content: space-around;
+		flex-wrap: wrap;
+		width:750px;
+		padding: 20px 30px 20px 30px;
+
+		
+	}
+	.activeprogram{
+	
+		background-color: #0080FF;
+	}
+	.bottom-text{
+		color:white;
+	}
+	.program-item{
+		display:flex;
+		flex-direction: row;
+	
+		flex-direction: column;
+		justify-content: center;
+		width:210px;
+		margin:10px;
+		border-color:#0080FF;
+		border-width:2px;
+	/* 	border: 1upx solid #0080FF; */
+		border-radius: 8px;
+		height:92px;
+		padding:10px 0 10px 0;
+		
+	}
+	.bottom-text{
+		font-size: 25px;
+		color: #A5A5A5;
+	}
+	.program-item.active{
+		border-color:#D2D2D2;
+		border-width:2px;
+		color:#D2D2D2;
+	}
+	
+	
+	
+	
+	
+</style>

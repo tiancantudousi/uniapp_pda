@@ -1,0 +1,88 @@
+<template>
+	<view class="border-bottom" style="padding-left:25px;padding-right:25px;box-sizing: border-box;width:750px;flex-direction: row;align-items: center;" @click="showdetail(item)">
+		
+	     
+		 <view class="border flexcenter border-all">
+		  		 <view v-if="item.result_name!='待检定'" class="circal" :class="[item.result_name=='合格'?'green':item.result_name=='不合格'?'red':'']"></view>
+		  </view>
+		  <view class="machine" style="flex:1;"> 
+		  	
+		  	 <text style="font-size:36px;">{{item.dev_name}}({{item.d_gc}}/{{item.t_gc}})</text>
+		  	 <view class="result" style="flex-direction: row;align-items: center;" v-if="item.result_name!='待检定'">
+		  	 	<text style="font-size:35px;margin-right: 10px;">{{item.result_name}}</text>
+           <image  v-if="item.result_name=='合格'" src="../../static/img/i-Check.png" class="quality" alt=""></image>	
+            <image  v-if="item.result_name=='不合格'" src="../../static/img/unquality.png" class="unqulity" alt=""></image>	
+		  	 </view>
+		  </view>
+		  		
+		  	<text class="result-time" style="font-size:30px">
+		  		  {{start}}
+		  	</text>
+		
+	</view>
+</template>
+
+<script>
+	export default {
+		props: ['item'],
+		components: {
+
+		},
+		created(){
+			this.start=this.item.start_dt.slice().substring(11,this.item.start_dt.length);
+		},
+
+		data() {
+			return {
+                   start:''
+			}
+		},
+		methods: {
+			//            choseitem(){
+			// 			   this.item.checked=!this.item.checked;
+			// 			   this.$emit('choseItem',this.item);
+			// 		   },
+					   showdetail(item){
+						   if(item.result_name=='待检定'){
+							   this.$emit('itemClick',item);
+						   }
+						   
+					   }
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+<style scoped>
+    .border{
+    	border-radius: 50%;
+    	width:50px;
+    	height:50px;
+    	padding:5px;
+    }
+	.circal{
+		width:40px;
+		height:40px;
+		border-radius: 50%;
+	}
+	.green{
+		background-color: green;
+	}
+	.red{
+		background-color: red;
+	}
+	.machine{
+		padding-left:20px;
+	}
+	  	.quality{
+	  	
+	  		width:50px;
+	  		height:33px;
+	  	
+	  }
+	 .unqulity{
+	  	width:30px;
+	  	height:30px;
+	  }
+
+	
+</style>

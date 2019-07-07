@@ -1,0 +1,351 @@
+<template>
+	<view class="maincontent">
+		<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+		<view class="home-content" style="position:relative;">
+			<!-- 单独header组件 -->
+			<navhearder @stepClick="stepClick" :buttonList="buttonList" :loginForm="loginForm"></navhearder>
+
+
+			<scroller class="scroller" style="flex:1;width:750px;" v-if="activeIndex==0">
+				<view class="border-bottom" style="padding: 20px" v-for="(item,index) in washList" :key="index" @click.stop="navigatestate(item,index)">
+					<view style="flex-direction: row;align-items: center;" >
+						<text class="machine" style="flex:1;">{{item.dev_name}}</text>
+						<view class="item-state flexcenter" :class="[item.state_name=='空闲中'?'free':item.state_name=='待检定'?'notdocimasy':item.state_name=='灭菌中'?'inwashing':item.state_name=='准备中'?'prepare':'']">
+							<text style="font-size: 30px;color:white">{{item.state_name}}</text>
+						</view>
+						
+					</view>
+					<view class="flexbetween" style="flex-direction: row;align-items: center;">
+						<view class="flexbetween">
+							<view class="flexbetween">
+								<text class="day-time1">日锅次&nbsp;&nbsp;</text>
+								<text class="day-time2">{{item.d_gc}}</text>
+							</view>
+							<view style="padding-left:30px;" class="flexbetween">
+								<text class="day-time1">总锅次&nbsp;&nbsp;</text>
+								<text class="day-time2">{{item.t_gc}}</text>
+							</view>
+						</view>
+
+						<view class="time">
+							 
+							<text v-if="item.state_name=='待检定'" class="timefont"> {{item.start_dt1}} - {{item.end_dt1}}</text>
+							<view class="flexcenter" v-if="item.state_name=='灭菌中'">
+								 <image src="../../static/img/i-time.png" style="width:33px;height:33px;" alt=""></image>
+							
+								<text  class="washing" style="padding-left:15px;font-size: 30px;">{{item.countdown}}</text>
+							</view>
+						</view>
+					</view>
+				</view>
+			</scroller>
+			<cencusComponent v-if="activeIndex==1"></cencusComponent>
+
+
+
+		</view>
+		<wxc-loading :show="loading"></wxc-loading>
+
+	</view>
+</template>
+
+
+<script>
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	const globalEvent = weex.requireModule('globalEvent')
+	import {
+		WxcLoading
+	} from 'weex-ui';
+	import Navhearder from '../_mods/navhearder.nvue';
+	import loadingmore from '../_mods/loading-more.nvue';
+	import scrollerComponent from '../_mods/scroller.nvue';
+	import cencusComponent from "./components/cencus.nvue";
+
+
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	import * as _ from '../../common/lodash.min.js';
+	import {
+		getsterilizationList,getsterilizationdataList,getsterilizationpacklist,getDetailsterilization
+		// getWashList,getMachineDetail,updatesignMachine,getMachines
+	} from "../../common/api.js";
+
+
+
+	export default {
+		mixins: [myMixin],
+		components: {
+			Navhearder,
+			WxcLoading,
+			loadingmore,
+			cencusComponent
+		},
+		data() {
+			return {
+				buttonList: ['灭菌','统计'],
+				washList:[],
+				loadingType:2,
+				page:1,
+				pageSize:20,
+				loading: false,
+				loginForm: {},
+				timer:'',
+				activeIndex:0
+			}
+		},
+
+		created() {
+			console.log('wash created')
+			this.setbarheight();
+			storage.getItem('loginForm', event => {
+				this.loginForm = JSON.parse(event.data);
+				this.getWashList();
+				this.getMachines();
+			})
+			globalEvent.addEventListener("plusMessage", e => {
+			    if (e.data.key=="sterilizationmachine") {
+				 console.log('fresh washmachine')
+			       console.log(typeof e.data.value) //boject
+				   this.updatesignMachine(e.data.value);
+				   // this.outsourcingsearch();
+			    }
+			});
+
+		},
+        destroyed(){
+			// clearInterval(this.timer);
+		},
+		methods: {
+			stepClick(index){
+					this.activeIndex=-1;
+			        setTimeout(()=>{this.activeIndex=index;},1)
+			},
+// 			onemuinterefresh() {
+// 				this.timer = setInterval(() => {
+// 					this.getWashList();
+// 				}, 120000)
+// 			},
+			getMachines() {
+				const data={"Sbxx":{"did":this.loginForm.deptId,"is_inv":"1","sb_type":"3~4~5"},"LoginForm":this.loginForm};
+				getsterilizationList(data).then(res => {
+					if (res.errorCode == "0") {
+						storage.setItem('sterilizationmachineList', res.returnValue.SbxxList, event => {})
+						// this.set_machines(res.returnValue.SbxxList);
+					}
+
+				})
+			},
+
+			updatesignMachine(item) {
+				const data={"Mj":{"dev_id":item.dev_id},"LoginForm":this.loginForm};
+				this.loading=true;
+				getDetailsterilization(data).then(res => {
+					let itemIndex = _.findIndex(this.washList, {
+						dev_id: item.dev_id
+					});
+					this.loading=false;
+					if (res.errorCode == "0") {
+						// this.washList[itemIndex]=res.returnValue.qxjStateList[0];
+						let item=res.returnValue.mjjStateList[0];
+				
+						this.$set(this.washList, itemIndex, Object.assign(res.returnValue.mjjStateList[0], {
+							'countdown': ''
+						}));
+						if(item.state_name=="灭菌中"){
+							this.onstatewashing(item);
+						}
+						if(item.state_name=="待检定"){
+							item.start_dt1 = item.start_dt.slice().substring(11, item.start_dt.length);
+							item.end_dt1 = item.end_dt.slice().substring(11, item.end_dt.length);
+						}
+						// this.set_activeMachine({...res.returnValue.qxjStateList[0],'countdown':''});
+					}
+
+				}).catch((error)=>{this.loading=false;})
+			},
+			navigatestate(item, index) {
+				storage.setItem('activeSterililzationmachine', item, event => {})
+				this.getMachineDetail(item);
+			},
+			navigate(item) {
+				switch (item.state_name) {
+					case "空闲中":
+					 storage.setItem('sterilizationpotionid','free', event => {
+						 uni.navigateTo({
+						 	url: '/pages/sterilizationfree/sterilizationfree'
+						 });
+						
+					 })
+					 break;	
+					case "待检定":
+					storage.setItem('sterilizationchechjumpPage','sterilization',e=>{
+						uni.navigateTo({
+							url: '/pages/sterilizationcheck/sterilizationcheck?id=1&name=uniapp'
+						});
+					})
+						break;
+					case "灭菌中":
+						uni.navigateTo({
+							url: '/pages/sterilizationing/sterilizationing?id=1&name=uniapp'
+						});
+						break;
+					case "准备中":
+						uni.navigateTo({
+							url: '/pages/sterilizationfree/sterilizationfree?id=1&name=uniapp'
+						});
+						break;
+				}
+			},
+
+			getMachineDetail(item) {
+				this.loading=true;
+				const data={
+					"Mj":item,"LoginForm":this.loginForm};
+				getsterilizationpacklist(data).then(res => {
+					if (res.errorCode == "0") {
+						storage.setItem('sterilizationdetailList', res.returnValue.mjDtlList, event => {this.navigate(item);})
+					}
+					this.loading=false;
+
+					
+				}).catch((error)=>{this.loading=false;})
+			},
+			getWashList(){ //获取清洗机列表
+				this.loading=true;
+				const data={
+					"Mj":{"tmxxList":[]},"LoginForm":this.loginForm
+				}
+				// this.fetchSysTime(); //获取系统时间			
+				getsterilizationdataList(data).then(res => {
+					console.log(JSON.stringify(res));
+					this.loading=false;
+					if (res.errorCode == "0") {
+						this.washList = res.returnValue.mjjStateList.map(item => {
+							return Object.assign(item, {
+								'countdown': '',start_dt1:'',end_dt1:''
+							});
+						});
+						this.buildstate();
+					}
+				})
+			},
+			async buildstate(){
+				let systime=await this.getsystime();
+				this.washList.forEach(item=>{
+					if (item.state_name == '待检定') { 
+						item.start_dt1 = item.start_dt.slice().substring(11, item.start_dt.length);
+						item.end_dt1 = item.end_dt.slice().substring(11, item.end_dt.length);
+						return;
+					}
+					if(item.state_name == '灭菌中'){
+						this.conutleftTime(item.start_dt,item.plan_time,systime,item);
+					}
+				})
+			},
+			async onstatewashing(item){
+					
+				let systime=await this.getsystime();
+// 				console.log('bug');
+// 				console.log(systime);
+// 				console.log(JSON.stringify(item));
+// 				console.log(item.start_dt);
+// 				console.log(item.plan_time);
+				this.conutleftTime(item.start_dt,item.plan_time,systime,item);
+			},
+			conutleftTime(starttime,planTime,systime,item){
+				starttime = starttime.replace(new RegExp("-","gm"),"/");
+				const datatime={"LoginForm":this.loginForm};
+				// let temptime=systime;
+				let systemtime=systime.replace(new RegExp("-","gm"),"/");			
+				let leftTime =Number(planTime)*60*1000-((new Date(systemtime)).getTime()-(new Date(starttime)).getTime()); //得到毫秒数
+				console.log(leftTime);
+				let leftminute= {"minute":leftTime<60000?0:new Date(leftTime).getMinutes(),"second":new Date(leftTime).getSeconds()};
+				console.log('倒计时数据')
+				console.log(JSON.stringify(leftminute))
+				this.countdownfun(Number(leftminute.minute),Number(leftminute.second),item);
+			},
+			countdownfun( minute,seconds, item) {
+				console.log("开始倒计时");
+				let minutes= minute;
+				let timer = setInterval(() => {
+					if (seconds == 0 && minutes == 0) {
+						this.updatesignMachine(item)
+						clearInterval(timer); //清除定时器
+						return;
+					}
+					seconds--;
+					if (seconds < 0) {
+						seconds = 59;
+						minutes--;
+					}
+					let minutess = minutes < 10 ? '0' + minutes : minutes;
+					let secondss = seconds < 10 ? '0' + seconds : seconds;
+					this.$set(item,'countdown',minutess + ':' + secondss);
+				}, 1000)
+
+			},
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style scoped>
+	.item-content{
+		padding:0 20px 0 20px;
+	}
+	.timefont {
+		font-size: 30px;
+		color: #A5A5A5;
+	}
+
+	.washing {
+		color: #F5A623;
+	}
+
+	.day-time1 {
+		font-size: 33px;
+		color: #A5A5A5;
+	}
+
+	.day-time2 {
+		color: #0080FF;
+		font-size: 35px;
+	}
+
+	.main-list {
+
+		flex: 1;
+	}
+
+	.machine {
+		font-size: 38px;
+		color: #333333;
+	}
+
+
+
+	.item-state {
+		
+		flex:none;
+		border-radius: 100px;
+		padding:5px 10px 5px 10px;
+		box-sizing: content-box;
+	}
+
+	.free {
+		background-color: #41B862;
+	}
+
+	.inwashing {
+		background-color: #F5A623;
+	}
+
+	.notdocimasy {
+		background-color: #0080FF;
+	}
+
+	.prepare {
+		background-color: #A5A5A5;
+	}
+</style>

@@ -1,0 +1,38 @@
+<template>
+	<view style="width:750px;padding:10px;" class="top-list-item border-bottom" @click="showdetail">
+	
+		
+			 <view style="flex-direction: row;align-items: center;justify-content: center;flex:1;">
+				
+				 		<text style="font-size:35px;">{{item.bmc}}</text>
+			
+			 </view>
+			  
+			 <view style="flex-direction: row;align-items: center;justify-content: center;flex:1;">
+			
+				 		<text style="font-size:35px;">{{item.pb_num}}</text>
+				
+			 	
+			 </view>
+			
+	</view>
+</template>
+
+<script>
+	export default {
+		props: ['item'],
+		methods:{
+			showdetail(){
+				this.$emit('showdetail',this.item);
+			}
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style>
+      .top-list-item{
+    	   padding:20px;
+    	   flex-direction: row;
+    	   align-items: center;
+    }
+</style>

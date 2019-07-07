@@ -1,0 +1,420 @@
+<template>
+	<view class="maincontent">
+		<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+		<view class="home-content">
+			
+			<!-- 单独header组件 --> 
+			 <navhearder @stepClick="stepClick" :buttonList="buttonList"  :loginForm="loginForm"></navhearder>
+			 <cencus v-if="activeIndex==1" @showdetail="showdetail"></cencus>
+			 <view style="width:750px;flex:1;" v-if="activeIndex==0">
+				 <view class="flexaround input-row border-bottom">
+				 	<input class="input" type="text" v-model="downPerson" placeholder="请录入下送人" @input="downPersonId=''" @return="judgeScanType(downPerson,onpersonEnter)" ></input>
+				 	<input class="input" type="text" v-model="tmid" placeholder="请录入包条码" @return="judgeScanType(tmid,doacept)"></input>
+				 </view>
+				 <view class="main-list">
+				 	<scroller class="scroller">
+				 		<view class="list-item border-bottom" v-for="(item,index) in list">
+				 			<view class="checkimage-view" :class="[!item.checked?'activeborder':'']" @click="choseItem(item,index)" > 
+				 				<image src="../../static/img/i-ok.png" v-if="item.checked" class="check-image"></image>
+				 			</view>
+               <image src="../../static/img/timg.jpg" style="width:110px;height:110px;padding:15px;" alt=""></image>
+				 			 <view class="item-content">
+				 				 <view  class="flexbetween wrap">
+				 					 <text class="more-fontsize" style="word-break: break-all;">{{item.bmc}}</text>
+									 <text class="same-fontsize">{{item.xq_end}}</text>
+				 				 </view>
+				 				  
+				 				  <view class="flexbetween wrap">
+				 						<text class="same-fontsize">{{item.tmid}}</text>
+				 						 <text class="same-fontsize">{{item.xq_desp}}</text>
+				 				 </view>
+				 				<!-- <text class="more-fontsize">{{item.tmid}}</text>
+				 				 <text class="same-fontsize">{{item.bmc}}</text> -->
+				 			 </view>
+				 			   	<image src="../../static/img/i-right.png" style="width:10px;height:20px;margin:0 20px;" alt=""></image>
+				 			<!-- <view class="circal" @click.stop="choseitem" v-if="item.checked!=undefined" :class="{'active':item.checked}"></view> -->
+				 		</view>
+				 	</scroller>
+				 	
+				 </view>
+				 <view class="choseall input-row" style="flex-direction: row;align-items: center;border-color: #E5E5E5;border-top-width:2px;">
+				 	
+				 	<view class="checkimage-view" :class="[!choseall?'activeborder':'']" @click="choseAll()" > 
+				 		<image src="../../static/img/i-ok.png" v-if="choseall" class="check-image"></image>
+				 	</view>
+				 	<text style="font-size:30px;margin-left:30px;">全选({{list.length}})</text>
+				 	
+				 </view>
+				 <view class="bottom-button" @click="aceptAll">
+				 	<!-- <text class="same-button gray" style="border-color: white;border-right-width:2px;" @click="openNoAnimationMask">拒收</text> -->
+				 	<text class="same-button">批量接收</text>
+				 </view>
+				 
+		<!-- 		 <wxc-mask height="800"
+				           width="702"
+				           border-radius="0"
+				           duration="300"
+				           mask-bg-color="#FFFFFF"
+				           :has-overlay="true"
+				           :show-close="false"
+				           :show="show"
+				           :has-animation="false"
+				 		  @wxcMaskSetHidden="wxcMaskSetHidden"
+				          >
+				   <div class="content" @click="stop">
+				 		<div class="flexbetween">
+				 			<text style="font-size:30px;">拒收原因</text>
+				 			<image src="../../static/img/closecilcre.png" style="width:60px;height:60px;" @click="closeMask"></image>
+				 		</div>
+				     <div class="demo-title">
+				       <text class="title">Weex帮助你构建原生应用</text>
+				     </div>
+				     <text class="content-text"> 与 Web App、HTML5 App 或 hybrid App 不同，您可以使用 Weex 构建一个真正的原生应用。更贴心的是你的代码只需使用
+				       HTML、CSS、JavaScript 可以构建原生应用，上手非常简单。但实际上，应用的底层是 Objective-C 或 Java， 同时，Weex 提供很多 native
+				       组件或模块供开发人员使用。 </text>
+				   </div>
+				 </wxc-mask> -->
+				 
+				 <wxc-dialog :title="'包条码：'+tmid"
+				             :content="messagecontent"
+				             :show="showdialog"
+				 			 @wxcDialogCancelBtnClicked="showdialog=false"
+				             @wxcDialogConfirmBtnClicked="dialogConfirmBtnClick"
+				  ></wxc-dialog>
+			 </view>
+			 <cencusDetail v-if="showdetailitem"  @closeDetail="showdetailitem=false" :item="activeitem"></cencusDetail>
+		</view>
+		
+	</view>
+</template>
+
+
+<script>
+	
+	 var modal = weex.requireModule('modal');
+	 const storage = weex.requireModule('storage');
+	 import { WxcMask,WxcDialog } from 'weex-ui';
+	  // import Category from '../_mods/category.nvue';
+	   import Navhearder from '../_mods/navhearder.nvue';
+	   import cencusDetail from "./components/cencus-detail.nvue";
+	   import cencus from './components/cencus.nvue';
+	   	import {
+	   	gettobeacept,doacept,cancleAcept,aceptAll,getdownPerson
+	   } from "../../common/api.js";
+	   
+	  
+
+		
+	export default {
+		components: { WxcMask,Navhearder,WxcDialog ,cencus,cencusDetail},
+		data() {
+			return {
+				// tmid:'',
+				messagecontent:"已接收，是否撤销?",
+				showdialog:false,
+				choseall:false,
+				statusBarHeight: '',
+				buttonList:['接收','统计'], 
+				activeIndex:0,
+				loginForm:{},
+				downPerson:'',
+				downPersonId:'',
+				tmid:'',
+				show:false,
+				list: [],
+				showdetailitem:false,
+				activeitem:{}
+		
+			}
+		},
+		created() {
+		
+			this.setbarheight();
+			storage.getItem('loginForm', event => {
+			  this.loginForm = JSON.parse(event.data);
+			 this.gettobeacept();
+			
+			})
+		
+		},
+			
+		methods: {
+			showdetail(item){
+				this.activeitem=item;
+				this.showdetailitem=true;
+			},
+			aceptAll(){
+				let chosenList=this.list.filter(item=>{
+					return item.checked;
+				})
+				chosenList=chosenList.map(item=>{
+					return {tmid:item.tmid,dept_dname:this.loginForm.deptName,dept_did:item.deptId,xsr_uid:this.downPersonId}
+				})
+				console.log(JSON.stringify(chosenList));
+				const data={"JsLogList":chosenList,"LoginForm":this.loginForm};		
+				aceptAll(data).then(res=>{
+					console.log('aceptAll');
+					console.log(JSON.stringify(res));
+					if(res.status=="OK"){
+						modal.toast({message: '接收成功'});
+						this.gettobeacept();
+					}
+					if(res.status=="error"){
+						modal.toast({message:res.message})
+					}
+				})
+			},
+			dialogConfirmBtnClick(){
+				this.showdialog=false;
+				this.cancleAcept();
+			},
+			judgeScanType(data,callback) {
+			
+				let reg = new RegExp('^(TM|tm)');
+				if (reg.test(data)) { //包扫码
+					this.tmid = data.substring(2, data.length).trim();
+					this.doacept();
+					return;
+				}
+				let personReg = new RegExp('^(ZG|zg)');
+				if (personReg.test(data)) { //人员扫码
+					this.downPerson = data.substring(2, data.length).trim();
+					this.onpersonEnter();
+					return;
+				}
+				if(callback){
+					callback();
+					return;
+				}
+				modal.toast({message: `该条码${data}不存在`});
+			},
+			onpersonEnter() {
+				if (!this.downPerson) {
+					modal.toast({message: '请输入下收人编号'});
+					return;
+				}
+				this.getdownPerson();
+			},
+			getdownPerson() {
+				const data = {
+					"Userinfo": {
+						"us_userid": this.downPerson
+					},
+					"LoginForm": this.loginForm
+				}
+				getdownPerson(data).then(res => {
+					if (res.errorCode == "0") {
+						console.log('Userinfo')
+						console.log(JSON.stringify(res.returnValue.Userinfo))
+						this.downPerson=res.returnValue.Userinfo.us_username;
+						this.downPersonId=res.returnValue.Userinfo.us_userid;
+						// this.onColseDownPerson(res.returnValue.Userinfo)
+					}
+					if (res.status == "error") {						
+						modal.toast({message: res.message});
+					}
+					
+				})
+			},
+			gettobeacept(){
+				const data={"Tmxx":{"bnrList":[],"isChecked":false,"jsList":[],"zjFfList":[],"ff_did":this.loginForm.deptId},"LoginForm":this.loginForm};
+				console.log(JSON.stringify(this.loginForm));
+				gettobeacept(data).then(res=>{
+					console.log('gettobeacept');
+					console.log(JSON.stringify(res));
+					if(res.status=="OK"){
+						this.list=res.returnValue.TmxxList.map(item=>{
+							return {bmc:item.bmc,tmid:item.tmid,xq_desp:item.xq_desp,xq_end:item.xq_end,checked:false}
+						})
+					}
+				})
+			},
+			doacept(){
+				const data={"JsLog":{"tmid":this.tmid,xsr_uid:this.downPersonId},"LoginForm":this.loginForm};		
+				doacept(data).then(res=>{
+					console.log('doacept');
+					console.log(JSON.stringify(res));
+					if(res.status=="OK"){
+						modal.toast({message: `接收成功`});
+						this.gettobeacept();
+					}
+					if(res.status=="warn"){
+						this.showdialog=true;
+					}
+					if(res.status=="error"){
+						modal.toast({message:res.message})
+					}
+				})
+			},
+			cancleAcept(){
+				const data={"JsLog":{"tmid":this.tmid},"LoginForm":this.loginForm};		
+				cancleAcept(data).then(res=>{
+					console.log('doacept');
+					console.log(JSON.stringify(res));
+					if(res.status=="OK"){
+						modal.toast({message: `撤销成功`});
+						this.gettobeacept();
+					}
+					if(res.status=="error"){
+						modal.toast({message:res.message})
+					}
+				})
+				
+			},
+			
+			
+			
+			
+			
+			
+			
+			closeMask(){
+				 this.show = false;
+			},
+			stop(e){
+// 				  e.preventDefault();
+//       e.stopPropagation();
+			},
+			    wxcMaskSetHidden () {
+			  this.show = false;
+			},
+			openNoAnimationMask () {
+				console.log('fsdafadsf');
+			  this.show = true;
+			},
+			choseAll(){
+				this.choseall=!this.choseall;
+				this.list.forEach(item=>{
+					item.checked=this.choseall?true:false
+				})
+			},
+			choseItem(item,index){
+				item.checked=!item.checked;
+			},
+
+			setbarheight() { //设置状态栏高度
+				let _t = this;
+				setTimeout(() => { //获取状态栏高度，setTimeout后才能调用uni.  
+					uni.getSystemInfo({
+						success: function(res) {
+							_t.statusBarHeight = res.statusBarHeight;
+						}
+					});
+				}, 1);
+			},
+		
+			stepClick(index){
+					this.activeIndex=-1;
+			        setTimeout(()=>{this.activeIndex=index;},1)
+			},
+		}
+	}
+</script>
+
+<style>
+	
+	
+	.content {
+	  padding: 30px;
+	}
+	
+
+	/* 通用css */
+	.flexnone{
+		flex:none;
+	}
+	.wrap{
+		flex-wrap: wrap;
+	}
+	.flexaround{
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-around;
+	}
+	.flexcenter{
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+	}
+	.flexbetween{
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+	.maincontent {
+		display: flex;
+		flex: 1;
+		width: 750px;
+		flex-direction: column;
+	}
+	.home-content{
+		/* background-color: red; */
+		flex:1;
+		width:750px;
+		position:relative;
+	}
+	.border-bottom{
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+	.input-row{
+		height:90px;
+		width:750px;
+		padding:0 25px;
+	}
+  /* 通用css */
+  .input{
+	  width:350px;
+	  height: 150px;
+  }
+  .main-list{
+	 
+	 flex:1;
+   }
+   .activeborder{
+	   border-width:2px;
+	   border-color:#C7C7CC;
+   }
+   .checkimage-view{
+	   width:70px;
+	   height:70px;
+	   border-radius: 50%;
+   } 
+   .check-image{
+	  flex:1;
+   }
+   .item-content{
+	   
+	   flex:1;
+
+   }
+   
+   .list-item{
+	   padding:0 20px;
+	   flex-direction: row;
+	   align-items: center;
+   }
+   .more-fontsize{
+	  font-size:40px;
+   }
+   .same-fontsize{
+	   font-size:35px;
+   }
+   .bottom-button{
+	   width:750px;
+	   height:90px;
+	   flex-direction: row;
+   }
+   .same-button{
+	   font-size:45px;
+	   text-align: center;
+	   flex:1;
+	   color:white;
+	   height:90px;
+	   line-height:90px;
+	   background-color: #0080FF;
+   }
+   .gray{
+	   background-color:gray;
+   }
+</style>

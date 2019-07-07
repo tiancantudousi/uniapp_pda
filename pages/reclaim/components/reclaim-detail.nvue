@@ -1,0 +1,136 @@
+<template>
+	<view style="width:750px;position:absolute;top:0;left:0;background-color: white;" :style="{height:mainContentHeight+'wx'}">
+		<view class="head">
+			<text style="font-size:35px;">{{item.bmc}}</text>
+      <image src="../../static/img/i-close1.png" class="close-img" @click="closeDetail" alt=""></image>
+		</view>
+		<view class="mainimg">
+			<image src="../../static/img/timg.jpg" @load="onLoadimg" :style="{height:imgHeight+'px'}" style="width:750px;" alt=""></image>
+			<text class="tip">器械数量:{{detailList.length}}</text>
+		</view>
+		<scroller class="scroller" style="flex:1;" @loadmore="scrolltoBottom" :loadmoreoffset="20">
+			<view v-if="detailList.length" v-for="(item,index) in detailList" :key="index">
+				<view class="detail-item">
+					<text class="detail-index">{{index+1}}</text>
+					<text class="detail-name">{{item.clmc}}</text> 
+					<text class="detail-num">{{item.clsl}}</text>
+				</view>
+			</view>
+		</scroller>
+
+	</view>
+</template>
+
+<script>
+	import {
+		getmaterial
+	} from "../../../common/api.js";
+		import {
+		myMixin
+	} from "../../../common/mixins.js";
+	const storage = weex.requireModule('storage');
+
+	export default {
+		mixins: [myMixin],
+		components: {},
+		props: ['item'],
+	
+	
+		data() {
+			return {
+				detailList: [],
+				detailHeight: '100',
+				mainContentHeight:'2000',
+				imgHeight:300,
+				loginForm:{}
+			}
+		},
+		created(){
+			storage.getItem('loginForm', event => {
+			  this.loginForm = JSON.parse(event.data);
+			  this.getmaterial();
+			})
+			// this.getmaterial();
+			this.getmaincontentheight();
+		},
+		methods: {
+			onLoadimg(e){
+			    this.imgHeight=Math.floor(750*e.size.naturalHeight/e.size.naturalWidth);
+			},
+			async getmaincontentheight(){
+				this.mainContentHeight=await this.getmainContentHeight();
+			},
+			closeDetail(){
+				this.$emit('closeDetail',null);
+			},
+			getmaterial(){
+				const data={"Tmxx":{"bnrList":[],"isChecked":false,"jsList":[],"zjFfList":[],"tmid":this.item.tmid},"LoginForm":this.loginForm};
+				getmaterial(data).then(res=>{
+					if(res.returnValue){
+						this.detailList=res.returnValue.TmxxList;
+					}
+					
+					console.log(res,'包材料');
+					
+				})
+			},
+
+		},
+		mounted(){
+					
+		}
+	}
+</script>
+
+<style scoped>
+	.head {
+		padding: 20px 30px 20px 30px;;
+		position: relative;
+		flex: none;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+	.close-img {
+		width: 40px;
+		height: 40px;
+	}
+	.mainimg {
+		width: 750px;
+		position: relative;
+	}
+	.tip {
+		position: absolute;
+		left: 0;
+		top: 30px;
+		background-color: rgba(0, 0, 0, 0.5);
+		color: white;
+		font-size: 33px;
+	    padding:10px;
+		border-radius:5px;
+	}
+	.detail-content {
+		flex: 1;
+	}
+	.detail-item {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 20px 30px 20px 30px;
+	}
+	.detail-index {
+		font-size: 35px;
+		color: #A5A5A5;
+	}
+	.detail-name {
+		padding-left:30px;
+		flex: 1;
+		font-size: 38px;
+		color: #333333;
+	}
+	.detail-num {
+		font-size: 40px;
+		color: #0080FF;
+	}
+
+</style>

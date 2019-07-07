@@ -1,0 +1,266 @@
+<template>
+	<view style="flex:1" @click="closeSelect">
+		
+		
+		
+		<view class="input-row border-bottom" style="flex-direction: row;align-items: center;">
+			<view style="padding-left: 40px;flex-direction: row;justify-content: center;flex:1;align-items: center;">
+				<view class="flexaround paddingimage" style="width:375px;" @click="showSelect('beforeSelect')"> 
+					<text style="font-size:35px;">{{activebefore.name?activebefore.name:'换前架子'}}</text>
+					<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+				</view>
+			</view>
+			<view style="padding-left: 40px;flex-direction: row;justify-content: center;flex:1;align-items: center;">
+				<view class="flexaround paddingimage" style="width:375px;" @click="showSelect('afterSelect')">
+					<text style="font-size:35px;">{{activeafter.name?activeafter.name:'换候架子'}}</text>
+					<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+				</view>
+			</view>
+		</view>
+				
+		<view class="input-row border-bottom" style="flex-direction: row;align-items: center;">
+			<view class="checkimage-view" :class="[!choseall?'activeborder':'']" @click="onChoseall()" > 
+				<image src="../../static/img/i-ok.png" v-if="choseall" class="check-image"></image>
+			</view>
+			<text style="font-size:30px;margin-left:30px;">全选({{changeshelvesList.length}})</text>
+			<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="tmid" return-key-type="search" @focus="closeSelect" placeholder="请录入包条码" @return="dochangeshelves()"></input>
+		</view>
+		
+		
+		
+		
+			
+		<scroller class="scroller" @loadmore="scrolltoBottom" :loadmoreoffset="20">
+			<groundingListItem  v-if="changeshelvesList.length" v-for="(item,index) in changeshelvesList" @onChoseItem="onChoseItem" :key="index" :item="item"></groundingListItem>
+			<loadingmore v-if="changeshelvesList.length" :loadingType="loadingType"></loadingmore>
+		</scroller>
+		<view class="bottom-button">
+	
+			<text class="same-button" style="flex:2;" @click="surechangeshelves">确认换架({{accontNum}})</text>
+		</view>
+				
+ 
+			
+			 <scrollerComponent  :listshow="beforeSelect" @chose="onChoosebefore"  :width="'420'" :height="'400'" :left="'20'" :top="'80'" :dataList="shelvesList" :lable="'name'"></scrollerComponent>
+			 <scrollerComponent  :listshow="afterSelect" @chose="onChooseafter"  :width="'420'" :height="'400'" :left="'375'" :top="'80'" :dataList="shelvesList" :lable="'name'"></scrollerComponent>
+		
+	  <wxc-loading :show="loading"></wxc-loading>	
+	</view>
+</template>
+
+<script>
+	import scrollerComponent from '../../_mods/scroller.nvue';
+	// import loadingmore from '../../_mods/loading-more.nvue';
+		import { WxcLoading} from 'weex-ui';
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {formatDate} from "../../../common/tool.js";
+	import groundingListItem from "./grounding-list-item.nvue";
+	import * as _ from '../../../common/lodash.min.js';
+	import {
+		getshelvespack,surechangeshelves,getshelves,dochangeshelves
+	} from "../../../common/api.js";
+	import {
+		myMixin
+	} from "../../../common/mixins.js";
+	
+	export default {
+		props:{'todayReclaimNum':String},
+		mixins: [myMixin],
+		components: {scrollerComponent,groundingListItem,WxcLoading},
+	
+		data() {
+			return {
+               beforeSelect:false,
+			   afterSelect:false,
+			   activebefore:'',
+			   activeafter:'',
+			   page:1,
+			   pageSize:20,
+			   changeshelvesList:[],
+			   accontNum:0,
+			   loginForm:{},
+			   shelvesList:[],
+			   choseall:false,
+			   tmid:'',
+			   loading:false
+				
+			}
+		},
+		created(){
+			storage.getItem('loginForm', event => {
+			  this.loginForm = JSON.parse(event.data);
+			  this.getshelves();
+			
+			})
+		},
+		methods:{
+				onChoseItem(item) { //单个包被选中
+				item.checked ? this.accontNum++ : this.accontNum--;
+			},
+				showSelect(name){
+			    if(name!="beforeSelect"){
+					this.beforeSelect=false;
+				}
+				if(name!="afterSelect"){
+					this.afterSelect=false;
+				}
+			    setTimeout(()=>{
+					this[name]=!this[name];
+				},20)
+				
+			},
+				onChoseall() { //全部选中
+					if (!this.changeshelvesList.length) {
+						return;
+					}
+					this.choseall = !this.choseall;
+					this.changeshelvesList.forEach(item => {
+						item.checked = this.choseall ? true : false;
+					})
+					this.accontNum = this.choseall ? this.changeshelvesList.length : 0;
+				},
+				dochangeshelves(){
+				if(!this.activeafter){
+					modal.toast({message: "请选择换后架子"});
+					return;
+				}
+				const data={"CcLog":{"jz_name":this.activeafter.name,"tmidlist":[],"jz_id":this.activeafter.id,"tmid":this.tmid},"LoginForm":this.loginForm};
+				dochangeshelves(data).then(res=>{
+					
+					if(res.status=="OK"){
+						modal.toast({message: "换架成功"});
+						this.changeshelvesList=[];
+						this.getshelvespack();
+						this.tmid='';
+					}
+					if(res.status=="error"){
+						modal.toast({message: res.message});
+					}
+				})
+			},
+				getshelves(){
+				const data={"Jzxx":{"is_inv":"1"},"PageReq":{},"LoginForm":this.loginForm};
+				getshelves(data).then(res=>{
+					if(res.status=="OK"){
+						this.shelvesList=res.returnValue.rows;
+					}
+					if(res.status=="error"){
+						modal.toast({message: res.message});
+					}
+				})
+			},
+			scrolltoBottom() {
+				this.page++;
+				this.loadingType = 2;
+				this.getshelvespack();
+
+			},
+			getchoosepack(){
+				let choosepack=this.changeshelvesList.filter((item)=>{
+					return item.checked;
+				})
+				choosepack=choosepack.map(element=>{return {tmid:element.tmid,"jz_name":this.activeafter.name,"tmidlist":[],"jz_id":this.activeafter.id,}});
+				return choosepack;
+			},
+			surechangeshelves(){
+				if(!this.activeafter){
+					modal.toast({message: '请选择换后货架'});
+					return;
+				}
+				let chosenpack=this.getchoosepack();
+				if(!chosenpack.length){
+					modal.toast({message: '请选择包'});
+					return;
+				}
+				const data = {
+					"CcLogList":chosenpack,"LoginForm": this.loginForm
+				}
+				surechangeshelves(data).then(res => {
+					
+					if (res.status == "OK") {
+							modal.toast({message: '换架成功'});
+						this.changeshelvesList=[];
+						this.getshelvespack();
+					}
+					if(res.status == "error"){
+						modal.toast({message: res.message});
+					}
+				})
+			},
+	        closeSelect(){
+				this.beforeSelect=false;
+				this.afterSelect=false;
+			},
+			onChoosebefore(item) {
+				if(item==this.activebefore){
+					return;
+				}
+				this.beforeSelect = false;
+				this.activebefore = item;
+				this.changeshelvesList=[];
+				this.getshelvespack();
+			},
+			onChooseafter(item) {
+				this.afterSelect = false;
+				this.activeafter = item;
+			},
+			getshelvespack(){
+				
+				const data={"Tmxx":{"bnrList":[],"isChecked":false,"jsList":[],"zjFfList":[],"cc_shelf_id":this.activebefore.id},"PageReq":{	"page": this.page, 
+						"rows": this.pageSize},"LoginForm":this.loginForm};
+						this.loading=true;
+				getshelvespack(data).then(res=>{
+					this.loading=false;
+					if(res.status=="OK"){
+						let templist=res.returnValue.rows.map(item => {
+							return {
+								bmc: item.bmc,
+								tmid: item.tmid,
+								checked: false,
+								xq_desp: item.xq_desp,
+								mj_start_dt: item.mj_start_dt
+							}
+						});
+						this.changeshelvesList = this.changeshelvesList.concat(templist);
+						// changeshelvesList = JSON.parse(JSON.stringify(this.changeshelvesList));
+					
+					}
+				})
+			},
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+<style scoped>
+	.cencus-font{
+		font-size: 80px;
+			color: #FFA613;
+	}
+	.same-button{
+		   font-size:45px;
+		   text-align: center;
+		   color:white;
+		   height:90px;
+		   line-height:90px;
+		   background-color: #0080FF;
+	}
+	.bottom-button{
+		   width:750px;
+		   height:90px;
+		   flex-direction: row;
+	}
+	  .check-image{
+		   flex:1;
+	}
+	  .activeborder{
+		   border-width:2px;
+		   border-color:#C7C7CC;
+	}
+	  .checkimage-view{
+		   width:60px;
+		   height:60px;
+		   border-radius: 50%;
+	} 
+
+</style>

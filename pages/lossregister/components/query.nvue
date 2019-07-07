@@ -1,0 +1,211 @@
+<template>
+	<view style="flex:1" @click="closeSelect">
+		<wxc-loading :show="loading"></wxc-loading>	
+			<view class="input-row flexbetween border-bottom">
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="startTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('start')" placeholder="日期" />
+             <image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="endTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('end')" placeholder="日期" />
+					<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+			</view>
+				<view class="input-row border-bottom" style="flex-direction: row;align-items: center;">
+					<view class="flexaround paddingimage" @click="showSelect('deptSelect')" style="flex:1;align-items: center;">
+						<input style="height:60px;flex:1;" type="text" v-model="dept" placeholder="科室" @input="onsearchdept($event)"></input>
+				  	<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+				</view>
+				<view class="main-list" style="flex:1;width:750px;">
+					<scroller class="scroller" @loadmore="scrolltoBottom" :loadmoreoffset="20">
+						<queryItem v-for="(item,index) in queryList" :item="item" ></queryItem>	
+						<!-- <loadingmore v-if="todayReclaimList.length" :loadingType="loadingType"></loadingmore> -->
+					</scroller>
+				</view>
+			<scrollerComponent 
+			:showpleaseSlect="true"
+			:listshow="deptSelect"
+			@chose="onChoosedept"
+			:width="'400'"
+			:height="'350'"
+			:left="'20'"
+			:top="'170'"
+			:dataList="kslist" 
+			:lable="'de_deptname'"></scrollerComponent>
+
+		
+	
+	</view>
+</template>
+
+<script>
+	import scrollerComponent from '../../_mods/scroller.nvue';
+	// import loadingmore from '../../_mods/loading-more.nvue';
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {formatDate} from "../../../common/tool.js";
+	import queryItem from "./query-item.nvue";
+	import * as _ from '../../../common/lodash.min.js';
+	import {
+		getquerylist,getquerydetail
+	} from "../../../common/api.js";
+	import {
+		myMixin
+	} from "../../../common/mixins.js";
+	import {
+		datewarnmixins
+	} from "../../../common/datewarnmixins.js";
+	
+	export default {
+		props:{'todayReclaimNum':String},
+		mixins: [myMixin,datewarnmixins],
+		components: {scrollerComponent,queryItem},
+	
+		data() {
+			return {
+				deptSelect:false,
+				
+				kslist:[],
+			
+				dept:'',
+				deptId:'',
+				deptlist:[],
+				loading:false,
+				startTime:formatDate(new Date(),"yyyy-MM-dd"),
+				endTime:formatDate(new Date(),"yyyy-MM-dd"),
+				
+				queryList: [],
+				loadingType:2,
+			
+			
+			
+		
+	
+				
+				
+				page:1,
+				pageSize:20,
+				
+			
+				
+			   
+// 				startDt:'',
+// 				endDt:'',
+				
+				// initTime:formatDate(new Date(),"yyyy-MM-dd"),
+				
+			}
+		},
+		created(){
+// 			console.log(this.todaycensusNum);
+// 			for(var i=0;i<30;i++){
+// 				this.censusList.push(['key',[{'bmc':'cehsisfdasd','hstype_name':'已过期','tmid':'fafasdfasd','qx_num':'fdsfsad'}]])
+// 			}
+			this.getsystime().then(res=>{
+				this.startTime=res.slice(0,11);
+				this.endTime=res.slice(0,11);
+				console.log('系统时间')
+				console.log(res);
+			})
+			storage.getItem('loginForm', event => {
+			  this.loginForm = JSON.parse(event.data);
+			 this.getquerylist();
+			
+			})
+			storage.getItem('deptlist', event => {
+			  this.deptlist=JSON.parse(event.data);
+			})
+		},
+		methods:{
+			getquerylist(){
+				const data={"Sh":{"end_dt":this.endTime,sh_did:this.deptId,"start_dt":this.startTime},"LoginForm":this.loginForm};
+				getquerylist(data).then(res=>{
+					console.log('getquerylist');
+					console.log(JSON.stringify(res));
+					if(res.status=="OK"){
+						if(!res.returnValue.shList.length){
+							modal.toast({message:"未查询到相关记录!"})
+							return;
+						}
+						res.returnValue.shList.forEach(item=>{
+							this.getquerydetail(item.id,item.sh_dname,item.cre_uname,item.cre_dt)
+						})
+					}
+				})
+			},
+			getquerydetail(id,ksname,cre_uname,cre_dt){
+				const data={"ShDtl":{"shList":[],"sh_id":id},"LoginForm":this.loginForm};
+				getquerydetail(data).then(res=>{
+					console.log('getquerylist');
+					console.log(JSON.stringify(res));
+					if(res.status=="OK"){
+						if(!res.returnValue.shDtlList.length){
+							return;
+						}
+						res.returnValue.shDtlList.forEach(item=>{
+							this.queryList.push({clmc:item.clmc,bmc:item.bmc,sh_type_name:item.sh_type_name,tmid:item.tmid,sh_num:item.sh_num,sh_pc:item.sh_pc,ksname:ksname,cre_uname:cre_uname,cre_dt:cre_dt})  
+						})
+					     
+					}
+				})
+			},
+			datechange(timestate){
+				if(this.warningdate({'start':this.startTime,'end':this.endTime})){
+					timestate=='end'?modal.toast({message:'结束时间不得小于开始时间！'}):modal.toast({message:'开始时间不得大于结束时间！'});
+					return;
+				}
+				this.initdata()
+				this.getquerylist();
+			},
+			closeSelect(){
+				this.deptSelect=false;
+			},
+			showSelect(name) {
+				if (name != "deptSelect") {
+					this.deptSelect = false;
+				}
+				setTimeout(() => {
+					this[name] = !this[name];
+				}, 20)
+			
+			},
+
+			onChoosedept(item){
+				this.deptSelect=false;
+				if(item!=null&&this.deptId==item.de_deptid){
+					return;
+				}
+				this.censusList=[];
+				this.dept=item?item.de_deptname:'';
+				this.deptId=item?item.de_deptid:'';
+				this.initdata();
+				this.getquerylist();
+			},
+			initdata(){
+				this.queryList=[];
+				
+			},
+			onsearchdept(e){
+				this.deptSelect=true;
+				this.deptId='';
+				this.searchList(e.value);
+			},
+			searchList(e) {
+				this.searchDeptsthrottle(e, this.deptlist).then(res => {
+					this.kslist = res;
+				}).catch((e)=>{
+					console.log(e);
+				})
+			},
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+<style scoped>
+	.cencus-font{
+		font-size: 80px;
+			color: #FFA613;
+	}
+
+</style>

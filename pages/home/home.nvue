@@ -1,0 +1,503 @@
+<template>
+
+	<view class="maincontent" >
+		<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+		<view class="home-content">
+			      <image class="back-img" src="../../static/img/login-bg.png"></image>
+			       <view class="home-header">
+						
+				        <view class="home-header-top"> 
+						<view style="width:60px;flex:none;" @click="exit">
+							<image style="height:61px;width:35px;" src="../../static/img/i-back.png" alt="" > </image>
+						</view>
+							
+					        <text class="username">{{loginForm.userName}}</text>
+							<view class="some">
+								<image class="iconimg" src="../../static/img/i-notice.png"></image>
+							</view>
+							<image class="some iconimg" src="../../static/img/i-more.png"></image>
+							
+						</view>
+						<text class="notice-num">{{noticeNum}}</text>
+						<view class="home-header-bottom">
+							<view class="some flexrow">
+								<image class="bottom-image" src="../../static/img/i-number.png" alt=""></image>
+								<text class="loginimformation">{{loginForm.deptId}}</text>
+							</view>
+							<view class="some flexrow">
+								<image class="bottom-image" src="../../static/img/i-department1.png" alt=""></image>
+								<text class="loginimformation">{{loginForm.deptName}}</text>
+							</view>
+						</view>
+			
+					</view>
+					<view class="home-scroll" :style="{'height':homeHeight+'px'}">
+						<scroller class="scroller">
+							<view class="home-list-content">
+								<view class="home-list-item" v-for="(item,index) in listTop" @click="navigateTop(item)" :key="index">
+									<image class="home-list-image" :src="item.image" alt=""></image>
+									<text class="home-list-text">{{item.text}}</text>
+								</view>
+							</view>
+				
+							<view class="scan-code">
+								<text class="scan-code-line"></text>
+								<text class="scan-code-text">其它功能</text>
+								<text class="scan-code-line"></text>
+							</view>
+						
+							<view class="home-list-content">
+								<view class="home-list-item flexaround" v-for="(item,index) in listBottom" @click="navigateTop(item)" :key="index">
+									<image class="home-list-image" :src="item.image" alt=""></image>
+									<text class="home-list-text">{{item.text}}</text>
+								</view>
+							</view>
+						</scroller>
+					</view>
+		</view>
+			<wxc-dialog :title="'退出'"
+		            :content="'确定退出系统？'"
+		            :show="showdialog"
+					 @wxcDialogCancelBtnClicked="showdialog=false"
+		            @wxcDialogConfirmBtnClicked="dialogConfirmBtnClick"
+		          ></wxc-dialog>
+		<wxc-loading :show="loading"></wxc-loading>	
+	</view>
+</template>
+<script>
+		  const storage = weex.requireModule('storage')
+		  	var modal = weex.requireModule('modal');
+		let basePowerData = [{
+			image: '../../static/img/i-reclaim.png',
+			text: '回收'
+		},
+		{
+			image: '../../static/img/i-sorting.png',
+			text: '分拣'
+		},
+		{
+			image: '../../static/img/i-purging.png',
+			text: '清洗'
+		},
+		{
+			image: '../../static/img/i-Pack.png',
+			text: '清洗结果'
+		},
+		{
+			image: '../../static/img/i-Pack.png',
+			text: '打包'
+		},
+		{
+			image: '../../static/img/i-Pack.png',
+			text: '复核'
+		},
+		{
+			image: '../../static/img/i-sterilization.png',
+			text: '灭菌'
+		},
+		{
+			image: '../../static/img/i-Pack.png',
+			text: '灭菌结果'
+		},
+		{
+			image: '../../static/img/i-shelves.png',
+			text: '上架'
+		},
+		{
+			image: '../../static/img/i-issue.png',
+			text: '发放'
+		},
+		{
+			image: '../../static/img/i-reception.png',
+			text: '接收'
+		},
+		{
+			image: '../../static/img/i-use.png',
+			text: '使用'
+		},
+		{
+			image: '../../static/img/i-loss.png',
+			text: '损耗登记'
+		},
+		{
+			image: '../../static/img/i-boxsearch.png',
+			text: '包内容查询'
+		},
+		{
+			image: '../../static/img/i-barcode.png',
+			text: '条码失效'
+		},
+		{
+			image: '../../static/img/i-Claims.png',
+			text: '申领'
+		},
+		{
+			image: '../../static/img/i-department.png',
+			text: '科室申领'
+		},
+		{
+			image: '../../static/img/i-Outsidepackages.png',
+			text: '外来包'
+		},
+		{
+			image: '../../static/img/i-Packageborrowed.png',
+			text: '科室间借还包'
+		},
+		{
+			image: '../../static/img/i-creature.png',
+			text: '生物召回'
+		},
+		{
+			image: '../../static/img/i-stock.png',
+			text: '库存'
+		}
+	];
+
+
+	import {
+		getPower
+	} from "../../common/api.js";
+		import {
+		myMixin
+	} from "../../common/mixins.js";
+	import { WxcLoading,WxcDialog} from 'weex-ui';
+	export default {
+        components:{WxcLoading,WxcDialog},
+        mixins: [myMixin],
+		data() {
+			return {
+				// tmid:'',
+				statusBarHeight: '',
+				id: '',
+				numgc: '',
+				loginForm:{},
+				loading:false,
+
+				noticeNum: 200,
+				dialogTitle: '加急包发放',
+				homeHeight: 'auto',
+				listTop: [],
+				listBottom: [],
+				settimeclick:true,
+				showdialog:false
+			}
+		},
+		created() {
+			console.log('created');
+			this.setbarheight();
+			
+			this.linsent();
+			storage.getItem('loginForm', event => {
+              this.loginForm = JSON.parse(event.data);
+			  this.getPower();
+            })
+		},
+	
+		methods: {
+			dialogConfirmBtnClick(){
+				 uni.postMessage({key: "exit",value:true});
+			    // plus.runtime.quit()
+			},
+			exit(){
+				this.showdialog=true;
+			},
+			getPower() {
+				
+				const data = {
+					"Metafunction": {
+						"us_userid": this.loginForm.userId,
+						"me_appid": "PDA"
+					},
+					"LoginForm": this.loginForm
+				};
+				this.loading=true;
+				getPower(data).then(res => {
+					console.log(res, '权限数据');
+					this.loading=false;
+					this.sortPower(res.returnValue.metalist);
+				
+				})
+
+			},
+			sortPower(data) {
+				data.forEach(item => {
+					let havepowerItem =basePowerData.find((element)=>{
+						return element.text == item.me_menulable;
+					})
+					if (havepowerItem) {
+
+						this.listTop.length < 9 ? this.listTop.push(havepowerItem) : this.listBottom.push(havepowerItem);
+					}
+
+				})
+
+				
+			},
+			navigateTop(item) {
+				if(!this.settimeclick){
+					return;
+				}
+				this.settimeclick=false;
+				setTimeout(()=>{
+					this.settimeclick=true;
+				},2000)
+				switch (item.text) {
+					case "回收":
+						uni.navigateTo({
+							url: `/pages/reclaim/reclaim`
+						});
+						break;
+					case "清洗":
+						uni.navigateTo({
+							url: `/pages/wash/wash`
+						});
+						break;
+					case "清洗结果":
+						uni.navigateTo({
+							url: `/pages/washresult/washresult`
+						});
+						break;
+					case "打包":
+					   storage.setItem('packcencus','pack', event => {
+					        uni.navigateTo({url: `/pages/pack/pack`});
+					  })
+						
+						break;
+					case "复核":
+					   storage.setItem('packcencus','composite', event => {
+					      uni.navigateTo({
+					      	url: `/pages/composite/composite`
+					      });
+					  })
+						
+						break;
+					case "灭菌":
+						uni.navigateTo({
+							url: `/pages/sterilization/sterilization`
+						});
+						break;
+					case "灭菌结果":
+						uni.navigateTo({
+							url: `/pages/sterilizationresult/sterilizationresult`
+						});
+						break;
+					case "上架":
+						uni.navigateTo({
+							url: `/pages/grounding/grounding`
+						});
+						break;
+					case "发放":
+						uni.navigateTo({
+							url: `/pages/provide/provide`
+						});
+						break;
+					case "损耗登记":
+						uni.navigateTo({
+							url: `/pages/lossregister/lossregister`
+						});
+						break;
+					case "条码失效":
+						uni.navigateTo({
+							url: `/pages/barcodefailure/barcodefailure`
+						});
+						break;
+					case "接收":
+					uni.navigateTo({
+						url: `/pages/accept/accept`
+					});
+					break;
+					case "包内容查询":
+					uni.navigateTo({
+						url: `/pages/packread/packread`
+					});
+					break;
+					case "使用":
+					uni.navigateTo({
+						url: `/pages/use/use`
+					});
+					break;
+					case "外来包":
+					uni.navigateTo({
+						url: `/pages/outsourcing/outsourcing`
+					});
+					break;
+							
+
+				}
+
+			},
+			
+			linsent(){
+				if (weex.isRegisteredModule('MiYing-edittext')) {
+					uni.requireNativePlugin('MiYing-edittext').dostart();
+					const globalEvent = weex.requireModule('globalEvent')
+					 globalEvent.addEventListener("onScanBarCode", e => {
+						 uni.postMessage({key:'onScanBarCode',value:e.datat});  
+						
+					 });
+				}
+			}
+		},
+		mounted(){
+			console.log('111');
+// 			setTimeout(() => {
+// 				this.linsent();
+// 			}, 100)
+		}
+	
+	}
+</script>
+
+<style>
+	.scan-code {
+		flex-direction: row;
+		align-items: center;
+		padding: 0 40px;
+	
+	
+	
+	
+	}
+	.scan-code-text {
+		font-size: 40px;
+		color: #0080FF;
+		letter-spacing: 0;
+		padding: 0 40px;
+	}
+	.scan-code-line {
+		flex: 1;
+		border-width:2px;
+		border-color:#E5E5E5;
+	
+	}
+	.flexrow{
+		flex-direction: row;
+	}
+	.maincontent {
+		display: flex;
+		flex: 1;
+		width: 750px;
+		flex-direction: column;
+	}
+	.home-content{
+		flex:1;
+		width:750px;
+		position:relative;
+	}
+
+
+	.back-img{
+		position:absolute;
+		left:0;
+		top:0;
+		width:750px;
+		height:200px;
+			border-bottom-left-radius:60px;
+		border-bottom-right-radius: 60px;
+	}
+	.home-header {
+		flex:none;
+		height: 200px;
+		border-bottom-left-radius:60px;
+		border-bottom-right-radius: 60px;
+		/* background: url('../../static/img/login-bg.png') no-repeat 100% 100%; */
+	
+	}
+	.home-header-top{
+		flex-direction: row;
+		padding:40px 20px;
+		
+	} 
+	.home-header-bottom{
+		flex-direction: row;
+		padding:0 20px 20px 20px;
+		align-items: center;
+		
+	} 
+	.username{
+		font-size:50px;
+		color:white;
+		flex:1;
+	}
+	.iconimg{
+		width:50px;
+		height:50px;
+	}
+	.some {
+		margin: 0 20px;
+		position:relative;
+	}
+	.notice-num{
+		color:white;
+		background-color: red;
+		border-radius: 10px;
+		text-align: center;
+		position:absolute;
+		top:25px;
+		right:100px;
+	}
+
+	.bottom-image{
+		
+			height: 28px;
+			width: 32px;
+		
+	}
+	.loginimformation{
+		color:white;
+		font-size:30px;
+		margin-left:10px;
+	}
+	
+	
+	
+	
+	
+	
+	.home-scroll {
+		position: relative;
+		flex:1;
+	
+	}
+	.home-list-content {
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+	
+	.home-list-item {
+		width: 250px;
+		align-items: center;
+		justify-content: center;
+		padding: 10px 0;
+		margin:20px 0;
+	
+	
+	}
+	.home-list-image {
+		width: 140px;
+		height: 140px;
+		margin-bottom: 20px;
+	}
+	.home-list-text{
+		font-size:40px;
+		text-align: center;
+	}
+
+
+
+	
+/* 	.some > view{
+		margin-left: 5px;
+	}
+
+	.moremargin {
+		margin-left: 20px;
+	} */
+	
+
+
+
+
+
+
+</style>

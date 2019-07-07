@@ -1,0 +1,60 @@
+<template>
+	<view style="width:750px;" class="list-item border-bottom" @click="updatepack">
+
+		 <image src="../../static/img/timg.jpg" class="timg-image"  alt=""></image>
+		 <view class="item-content" style="padding-right:20px;">
+			 <text class="same-fontsize">{{item.bmc}}</text>
+			 <view style="flex-direction: row;">
+				 <text class="same-fontsize">材料数量:</text>
+				 <text class="same-fontsize" style="color:red;">{{item.clnum}}</text>
+			 </view>
+			 
+		 </view>
+		 <text class="same-fontsize" style="color: #0080FF;width:80px;">{{item.bnum}}</text>
+     <image src="../../static/img/i-right.png" style="width:10px;height:20px;margin:0 20px 0 20px;" alt=""></image>
+	</view>
+</template>
+
+<script>
+	export default {
+		props:['item'],
+		created(){
+
+		},
+		methods:{
+			updatepack(){
+				this.$emit('updatepack',this.item)
+			}
+		}
+	}
+</script>
+
+<style>
+
+	 .border-bottom{
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+   .timg-image{
+	 width:150px;
+	 height:150px;
+	 padding:15px;
+	 flex:none;
+   }
+   .item-content{
+	    padding-right:20px;
+	   flex:1;
+   }
+   
+   .list-item{
+	   padding:0 20px;
+	   flex-direction: row;
+	   align-items: center;
+   }
+   .more-fontsize{
+	  font-size:40px;
+   }
+   .same-fontsize{
+	   font-size:35px;
+   }
+</style>

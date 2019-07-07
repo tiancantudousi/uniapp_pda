@@ -1,0 +1,622 @@
+<template>
+	<view style="width:750px;position:absolute;left:0;top:0;background-color: white;" :style="{height:mainContentHeight+'wx'}" @click="closeall">
+			<view class="head border-bottom">
+				<text style="font-size:35px;">新增</text>
+         <image src="../../static/img/i-close1.png" class="close-img" @click="closenewadd" alt=""></image>
+			</view>
+			<!-- <view style="flex:1;width:750px;" > -->
+				<scroller class="scroller" style="flex:1;">
+				  <view class="flexaround input-row border-bottom" style="align-items: center;">
+				  	<view class="flexaround paddingimage" @click="showSelect('shipperSelect')" style="flex:1;">
+				  		<text style="flex:1;height:60px;line-height:60px;font-size:35px;">{{shipper.name}}</text>
+				  		<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+				  	</view>
+				      <!-- <input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="delivery" placeholder="请输入送货人"></input> -->
+				  </view>
+				  <view class="flexaround input-row border-bottom" style="align-items: center;">
+				  	<view class="flexaround paddingimage" @click="showSelect('sendpersonSelect')" style="flex:1;align-items: center;">
+				  		<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="sendperson" @input="sendpersonSelect=true"  placeholder="请选择送货人"></input>
+				  		<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+				  	</view>
+				      <input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="phone" placeholder="请录入联系方式"></input>
+				  </view>
+				  <view class="flexaround input-row border-bottom aligncenter" @click="showSelect('packSelect')">			
+				  		<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="bid"  placeholder="请输入包拼音码" return-key-type="search"  @return="enterpack" @input="onsearchpack($event.value)"></input>
+				  		<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+				  </view>
+				  <view class="flexaround input-row border-bottom" style="align-items: center;">
+				  
+				      <input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="fhperson" placeholder="请录入复核人" return-key-type="search"  @input="fhpersonName=''" @return="getuserInfor('fhperson')"></input>
+				  	<text style="flex:1;font-size:30px;">{{fhpersonName}}</text> 
+				  </view>
+				  <view class="flexaround input-row border-bottom" style="align-items: center;">
+				  
+				      <input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="jjperson" placeholder="请录入交接人" return-key-type="search" @input="jjpersonName=''" @return="getuserInfor('jjperson')"></input>
+				  	<text style="flex:1;font-size:30px;">{{jjpersonName}}</text>
+				  </view>
+				  <view class="flexaround input-row border-bottom" style="align-items: center;">
+				  
+				      <input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="bltmid" placeholder="请录入病历号" return-key-type="search" @return="getoutperson"></input>
+				  			
+				  	<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="personName" placeholder="请录入病人姓名"></input>
+				  </view>
+				  <view class="flexaround input-row border-bottom" style="align-items: center;">
+				  
+				      <input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="mark" placeholder="备注"></input>
+				  		
+				  </view>
+				  <view  style="width:730px;margin:10px;border-style: solid;border-color:#E5E5E5 ;border-width:2px;border-radius: 5px;" @click="showchangeperson">
+				  	<view class="flexaround input-row border-bottom" style="align-items: center;">
+				  	
+				  	    <text style="flex:1;font-size:30px;">病人姓名:{{personName}}</text> 
+				  		<text style="flex:1;font-size:30px;">病人床号:{{bedNum}}</text> 
+				  	</view>
+				  	<view class="flexaround input-row border-bottom" style="align-items: center;">
+				  	
+				  	   
+				  		<text style="flex:1;font-size:30px;">病人科室:{{personDeptname}}</text>
+				  	</view>
+				  	<view class="flexaround input-row border-bottom" style="align-items: center;">
+				  	
+				  	     <text style="flex:1;font-size:30px;">手术名称:{{ssName}}</text> 
+				  	    <text style="flex:1;font-size:30px;">手术时间:{{ssTime}}</text>
+				  	</view>
+				  	<view class="flexaround input-row " style="align-items: center;">
+				  	
+				  	     <text style="flex:1;font-size:30px;">主刀医生:{{mainDocter}}</text>
+				  	    <text style="flex:1;font-size:30px;">手术医生:{{ssDocter}}</text>
+				  	</view>
+				  	
+				  </view>
+				  <view style="border-bottom-width: 2px;border-bottom-color: #E5E5E5;width:750px;height:0;"></view>
+				 <addlistitemComponent  v-for="(item,index) in addpacklist" :item="item" @updatepack="updatepack" :key="index"></addlistitemComponent>
+				  
+				  			
+				  <view class="bottom-button">
+				    <text class="same-button" style="flex:1;border-style: solid;border-right-width: 2px;border-color: white;" @click="updatepack('')">添加</text> 
+				  	<text class="same-button" style="flex:1;" @click="store">保存</text>
+					<text class="same-button" v-if="statename=='未审核'" style="flex:1;border-style: solid;border-right-width: 2px;border-left-width: 2px;border-color: white;" @click="dojuge">审核</text>
+					<text class="same-button" v-if="statename=='未审核'" style="flex:1;" @click="waste">作废</text>
+				  </view>
+				  <scrollerComponent :listshow="shipperSelect" @chose="onChooseshipper"  :width="'500'" :height="'500'" :left="'20'" :top="'80'" :dataList="shipperList" :lable="'name'"></scrollerComponent>
+				   <scrollerComponent :listshow="packSelect" @chose="onChoosepack"  :width="'450'" :height="'400'" :left="'20'" :top="'260'" :dataList="packlist" :lable="'bmc'"></scrollerComponent> 
+				   <scrollerComponent :listshow="sendpersonSelect" @chose="onChoosesendperson"  :width="'450'" :height="'400'" :left="'20'" :top="'170'" :dataList="sendpersonlist" :lable="'sh_uname'"></scrollerComponent> 
+				</scroller>
+		<!-- 	</view> -->
+			
+
+				
+				 
+	
+			
+		
+			
+			
+
+	<!-- 	<wxc-dialog :title="'包条码：'+tmid"
+		            :content="messagecontent"
+		            :show="showdialog"
+		            @wxcDialogCancelBtnClicked="showdialog=false"
+		            @wxcDialogConfirmBtnClicked="dialogConfirmBtnClick"
+		          ></wxc-dialog>
+		<wxc-loading :show="loading"></wxc-loading>	 -->	
+		<addpackComponent v-if="showaddpack" :item="activeItem" @closepackadd="onclosepackadd"></addpackComponent>
+		<personaddComponent v-if="showpersonadd" @closepackadd="onclosepersonadd" :personinformation="personinformation"></personaddComponent>
+	</view>
+</template>
+
+
+<script>
+	
+	
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage')
+	import {WxcLoading,WxcDialog} from 'weex-ui';
+
+	// import listItem from "./components/list-item.nvue";
+		import scrollerComponent from '../../_mods/scroller.nvue';
+		import addpackComponent from './addpack.nvue';
+		import addlistitemComponent from './newadd-list-item.nvue';
+		import personaddComponent from './personadd.nvue';
+	// import reclaimDetail from "../reclaim/components/reclaim-detail.nvue";
+	
+	
+	import {
+		myMixin
+	} from "../../../common/mixins.js";
+	import * as _ from '../../../common/lodash.min.js';
+	import {
+    	 getshippers,searchPacknvue,getsendperson,getuserInfor,getoutperson,outsourcingstore,getwlbList,wlbwaste
+	} from "../../../common/api.js";
+
+
+	  
+
+		
+	export default {
+		props:['statename','item'],
+		mixins: [myMixin],
+		components: {WxcLoading,scrollerComponent,WxcDialog,addpackComponent,addlistitemComponent,personaddComponent},
+		data() {
+			return {
+				phone:'',
+				sendpersonSelect:false,
+				sendpersonlist:[],
+				sendperson:'',
+			    shipper:{name:'请选择发货商'},
+				shipperList:[],
+				shipperSelect:false,
+				mainContentHeight:'2000',
+				loginForm:{},
+				fhperson:'',
+				fhpersonName:'',
+				jjperson:'', 
+				jjpersonName:'',
+				bltmid:'',
+				personName:'',
+				list:[],
+				packSelect:false,
+				bid:'',
+				packId:'',
+				timer:'',
+				packlist:[],
+				mark:'',
+				bedNum:'',
+				personDeptname:'',
+				ssName:'',
+				ssTime:'',
+				mainDocter:'',
+				ssDocter:'',
+				showaddpack:false,
+				addpacklist:[],
+				showpersonadd:false,
+				personinformation:{},
+				mainDocterid:'',
+				 ssDocterid:'', 
+				 activeItem:'',
+				
+				
+				
+// 				tmid:'',
+// 				resonSelect:false,
+// 				resonList:[],
+// 				reson:{name:'请选择失效原因'},
+// 				faliureList:[],
+// 				showdialog:false,
+// 				messagecontent:'',
+// 				
+// 				
+// 				loadingType:2,
+				loading:false,
+				
+				
+			
+			}
+		},
+	
+		created() {
+
+              this.getmaincontentheight();
+			storage.getItem('loginForm', event => {
+			    this.loginForm = JSON.parse(event.data);
+				this.getshippers();
+				this.getsendperson();
+			});
+			if(this.statename=="未审核"){
+				console.log('未审核');
+				console.log(JSON.stringify(this.item));
+				this.shipper=this.item.fhs_id?{id:this.item.fhs_id,name:this.item.fhs_name}:{name:'请选择发货商'};
+				this.sendperson=this.item.sh_uname?this.item.sh_uname:'';
+				this.phone=this.item.sh_info?this.item.sh_info:'';
+				this.fhperson=this.item.fh_uid?this.item.fh_uid:'';
+				this.fhpersonName=this.item.fh_uname?this.item.fh_uname:'';
+				this.jjperson=this.item.jj_uid?this.item.jj_uid:'';
+				this.jjpersonName=this.item.jj_uname?this.item.jj_uname:'';
+				this.personName=this.item.p_name?this.item.p_name:'';
+				this.bedNum=this.item.p_bed_no?this.item.p_bed_no:'';
+				this.ssName=this.item.surgery_name?this.item.surgery_name:'';
+				this.ssTime=this.item.surgery_dt?this.item.surgery_dt:'';
+				this.mainDocter=this.item.zd_doc_uname?this.item.zd_doc_uname:'';
+				this.mainDocterid=this.item.zd_doc_uid?this.item.zd_doc_uid:'';
+				this.ssDocter=this.item.surgery_uname?this.item.surgery_uname:'';
+				this.ssDocterid=this.item.surgery_uid?this.item.surgery_uid:'';
+				this.getwlbList(this.item.id);
+				 // personDeptname     bug 
+				          
+				 
+			} 
+		},
+			
+		methods: {
+			getwlbList(id){
+					const data={"WlbDtl":{"wlbghList":[],"wlb_id":id},"LoginForm":this.loginForm};
+				getwlbList(data).then(res=>{
+					console.log('getwlbList');
+					console.log(JSON.stringify(res));
+					 if(res.status=="OK"){
+					 this.addpacklist=res.returnValue.wlbDtlList.map(item=>{
+						return {packid:item.bid,bmc:item.bmc,clnum:item.dj_clsl,bnum:item.dj_num}
+				      	})
+					 }else{
+						  modal.toast({message:res.message})
+					 }
+				})
+			},
+			dojuge(){
+					const data={"Wlb":this.item,"LoginForm":this.loginForm};
+				Object.assign(data.Wlb,{},{"status":"1"});
+					console.log('data');
+				console.log(JSON.stringify(data));
+				wlbwaste(data).then(res=>{
+					console.log('wlbwaste');
+					console.log(JSON.stringify(res));
+					 if(res.status=="OK"){
+						  modal.toast({message:'审核成功'})
+					      this.closenewadd('reload');
+					 }else{
+						  modal.toast({message:res.message})
+					 }
+				})
+			},
+			waste(){
+				const data={"Wlb":this.item,"LoginForm":this.loginForm};
+				Object.assign(data.Wlb,{},{"status":"4"});
+					console.log('data');
+				console.log(JSON.stringify(data));
+				wlbwaste(data).then(res=>{
+					console.log('wlbwaste');
+					console.log(JSON.stringify(res));
+					 if(res.status=="OK"){
+						 modal.toast({message:'作废成功'})
+					      this.closenewadd('reload');
+					 }else{
+						  modal.toast({message:res.message})
+					 }
+				})
+			},
+			updatepack(item){
+				this.showaddpack=true;
+				let updateindex=this.addpacklist.findIndex(element=>{
+					return element.packid==item.packid
+				})
+				Object.assign(item,{},{updateindex:updateindex})
+				this.activeItem=item;
+			},
+			undatewlb(basedata,list){
+				const data={"Wlb":this.item,"wlbDtlList":list,"LoginForm":this.loginForm};
+				Object.assign(data.Wlb,basedata,{"status":"0"});
+					console.log('data');
+				console.log(JSON.stringify(data));
+				wlbwaste(data).then(res=>{
+					console.log('undatewlb');
+					console.log(JSON.stringify(res));
+					 if(res.status=="OK"){
+						 modal.toast({message:'保存成功'})
+					      this.closenewadd('reload');
+					 }else{
+						  modal.toast({message:res.message})
+					 }
+				})
+			},
+			store(){
+				let wlbDtlList=this.addpacklist.map(item=>{
+					return {bid:item.packid,bmc:item.bmc,dj_clsl:item.clnum,dj_num:item.bnum}
+				})
+				if(wlbDtlList.length==0){
+					modal.toast({message:'请添加包'})
+					return;
+				}
+				if(!this.jjperson){
+					modal.toast({message:'请录入交接人'})
+					return;
+				}
+			
+				const data={"Wlb":{
+					"fh_uid":this.fhperson, 
+					"fh_uname":this.fhpersonName,
+					"fhs_id":this.shipper.id,
+					"fhs_name":this.shipper.id?this.shipper.name:'',
+					"have_sms":"有",
+					"jj_uid":this.jjperson,
+					"jj_uname":this.jjpersonName,
+					"p_bed_no":this.bedNum,
+					"p_name":this.personName,
+					"remark":this.remark,
+					"sh_info":this.phone,
+					"sh_uname":this.sendperson,
+					"surgery_dt":this.ssTime,
+					"surgery_name":this.ssName, 
+					"surgery_uid":this.ssDocterid,
+					"surgery_uname":this.ssDocter,
+					"zd_doc_uid":this.mainDocterid,
+					"zd_doc_uname":this.mainDocter},"wlbDtlList":wlbDtlList,"LoginForm":this.loginForm};
+				if(this.statename=="未审核"){
+					this.undatewlb(data.Wlb,wlbDtlList);
+					return;
+				}
+				for(var key in data.Wlb){
+					if(!data.Wlb[key]){
+						delete data.Wlb[key];
+					}
+				}
+						console.log('data');
+					console.log(JSON.stringify(data));
+				outsourcingstore(data).then(res=>{
+					console.log('outsourcingstore');
+					console.log(JSON.stringify(res));
+					 if(res.status=="OK"){
+						  modal.toast({message:'保存成功'})
+						 this.closenewadd('reload');
+					 }else{
+						  modal.toast({message:res.message})
+					 }
+				})
+			},
+            onclosepersonadd(data){
+				this.showpersonadd=false;
+				if(data){
+					// const data={bedNum:this.bednum,ssName:this.suryname,ssTime:this.surytimedate+this.surytime, mainDocter:this.surymain, ssDocter:this.surydocter},
+					this.bedNum=data.bedNum;
+					this.ssName=data.ssName;
+					this.ssTime=data.ssTime;
+					this.mainDocter=data.mainDocter; 
+					this.mainDocterid=data.mainDocterid;
+					this.ssDocter=data.ssDocter;
+					this.ssDocterid=data.ssDocterid;
+				}
+			},
+			onclosepackadd(data){
+				this.showaddpack=false;
+				console.log('onclosepackadd');
+				console.log(JSON.stringify(data));
+				
+				if(data){
+					if(data.update){
+						this.updatesinglepack(data)
+						return;
+					}
+					let tempitem=this.addpacklist.find(item=>{
+						return item.packid==data.packid;
+					})
+					if(tempitem){
+						tempitem.bnum=Number(tempitem.bnum)+Number(data.bnum);
+						tempitem.clnum=Number(tempitem.clnum)+Number(data.clnum);
+						return;
+					}
+					this.addpacklist.push(data);
+				};
+			},
+			updatesinglepack(data){//点击包修改
+			    data.update=Number(data.update);
+               let tempitem= this.addpacklist[data.update];
+			   tempitem.bnum=data.bnum;
+			   tempitem.clnum=data.clnum?data.clnum:0;
+			    tempitem.packid=data.packid;
+				tempitem.bmc=data.bmc;
+				if(!data.bnum||data.bnum==0){//为零删除包
+					this.addpacklist.splice(data.update,1);
+				}
+			},
+			showchangeperson(){
+				if(this.personName==''){
+					 modal.toast({message:'请录入病人姓名'})
+					 return;
+				}
+				this.personinformation={personName:this.personName, bedNum:this.bedNum, ssName:this.ssName, ssTime:this.ssTime, mainDocter:this.mainDocter, ssDocter:this.ssDocter}
+				this.showpersonadd=true;
+			},
+			getuserInfor(name){
+				const data={"Userinfo":{"us_userid":this[name]},"LoginForm":this.loginForm};
+				getuserInfor(data).then(res=>{
+					console.log('getuserInfor');
+					console.log(JSON.stringify(res));
+					 if(res.status=="OK"){
+						 if(name=='fhperson'){
+							this.fhpersonName=res.returnValue.Userinfo.us_username
+							   
+						 }else{
+							 this.jjpersonName=res.returnValue.Userinfo.us_username
+							 
+						 }
+					 }else{
+						  modal.toast({message:res.message})
+					 }
+				})
+			},
+			closeall(){
+				this.sendpersonSelect=false;
+				this.packSelect=false;
+				this.shipperSelect=false;
+			},
+			onChoosesendperson(item){
+				this.sendpersonSelect=false;
+				this.sendperson=item.sh_uname;
+			},
+			async getmaincontentheight(){
+				this.mainContentHeight=await this.getmainContentHeight();
+				console.log('mainContentHeight');
+				console.log(this.mainContentHeight);
+			},
+			closenewadd(data){
+				this.$emit('closenewadd',data);
+			},
+		
+			getsendperson(){
+					const data={"Wlb":{},"LoginForm":this.loginForm};
+				getsendperson(data).then(res=>{
+					console.log('getsendperson');
+					console.log(JSON.stringify(res));
+					 if(res.status=="OK"){
+						 this.sendpersonlist=res.returnValue.ShrList;
+// 						 this.shipperList=res.returnValue.rows.map(item=>{sh_uname
+// 							 return {id:item.id,name:item.name}
+// 						 })
+						 // this.resonList=res.returnValue.sxyyList
+					 }
+				})
+			},
+			onsearchpack(e){
+				this.packId='';
+				clearTimeout(this.timer)
+				this.packSelect=true;
+				this.timer=setTimeout(()=>{
+					const data={"Bpzgl":{"py_code":e},"PageReq":{"page":"1","rows":"10"},"LoginForm":this.loginForm};
+					searchPacknvue(data).then(res=>{
+						console.log(res,'搜索包');
+						 if(res.errorCode=="0"){
+							this.packlist=res.returnValue.rows;
+							 // Vue.set(this.washList,itemIndex,res.returnValue.qxjStateList[0]);
+						}
+					})
+				},300)
+				
+			},
+			enterpack(){
+				if(this.packId==''){
+					modal.toast({message:'请选择包'});
+					return;
+				}
+				let tempitem=this.addpacklist.find(item=>{
+					return item.packid==this.packId;
+				})
+				modal.toast({message:'添加成功'});
+				if(tempitem){
+					tempitem.bnum++
+					return;
+				}
+				this.addpacklist.push({bmc:this.bid,packid:this.packId,clnum:0,bnum:1});
+				
+			},
+			onChoosepack(item){
+				this.packSelect=false;
+				this.bid=item.bmc;
+				this.packId=item.bid;
+				// this.addpacklist.push();
+				// this.getmaterialByBid();
+			},
+			getshippers(){
+				const data={"Sccj":{},"PageReq":{},"LoginForm":this.loginForm};
+				getshippers(data).then(res=>{
+// 					console.log('getshippers');
+// 					console.log(JSON.stringify(res));
+					 if(res.status=="OK"){
+						 this.shipperList=res.returnValue.rows.map(item=>{
+							 return {id:item.id,name:item.name}
+						 })
+						 // this.resonList=res.returnValue.sxyyList
+					 }
+				})
+			},
+			showSelect(name) {
+					if (name != "shipperSelect") {
+						this.shipperSelect = false;
+					}
+					if (name != "stateSelect") {
+						this.stateSelect = false;
+					}
+					if (name != "sendpersonSelect") {
+						this.sendpersonSelect = false;
+					}
+					
+					 
+					setTimeout(() => {
+						this[name] = !this[name];
+					}, 20)
+				
+			},
+			onChooseshipper(item){
+				this.shipperSelect=false;
+				this.shipper=item;
+			},
+			getoutperson(){
+				if(this.bltmid==''){
+					 modal.toast({message:'请输入病历号'})
+					 return;
+				}
+				const data={"Brxx":{"mrn":this.bltmid},"LoginForm":this.loginForm};
+				getoutperson(data).then(res=>{
+					console.log('getoutperson');
+					console.log(JSON.stringify(res));
+					 if(res.status=="OK"){
+						 let item=res.returnValue.brList[0];
+						 this.personName=res.returnValue.brList[0].p_name;
+						 this.bedNum=item.p_bed_no?item.p_bed_no:'';
+						 this.personDeptname=item.dept_dname?item.dept_dname:'';
+						 this.ssName=item.surgery_name?item.surgery_name:'';
+						 this.ssTime=item.surgery_dt?item.surgery_dt:'';
+						 this.mainDocter=item.zd_doc_uname?item.zd_doc_uname:'';
+						 this.ssDocter=item.surgery_uname?item.surgery_uname:'';	
+						 this.mainDocterid=item.zd_doc_uid?item.zd_doc_uid:'';	
+						 this.ssDocterid=item.surgery_uid?item.surgery_uid:'';	
+					 }else{
+						 modal.toast({message:res.message})
+					 }
+				})
+			},
+		
+
+
+
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+<style scoped>
+	.head {
+		padding: 20px 30px 20px 30px;;
+		position: relative;
+		flex: none;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+	.close-img {
+		width: 40px;
+		height: 40px;
+	}
+	.same-button{
+		   font-size:45px;
+		   text-align: center;
+		   color:white;
+		   height:90px;
+		   line-height:90px;
+		   background-color: #0080FF;
+	}
+	  .bottom-button{
+		  flex:none;
+		   width:750px;
+		   height:90px;
+		   flex-direction: row;
+	}
+
+	.maincontent {
+		display: flex;
+		flex: 1;
+		width: 750px;
+		flex-direction: column;
+	}
+	.home-content{
+		/* background-color: red; */
+		flex:1;
+		width:750px;
+		position:relative;
+	}
+	.border-bottom{
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+	.input-row{
+		height:90px;
+		width:750px;
+		padding:0 25px;
+	}
+
+  .main-list{
+	 
+	 flex:1;
+   }
+ 
+  
+</style>
+
+

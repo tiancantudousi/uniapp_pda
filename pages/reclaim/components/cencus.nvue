@@ -1,0 +1,266 @@
+<template>
+	<view style="flex:1;" @click="closeSelect">
+		
+				
+			<view class="flexbetween border-bottom" style="height:200px;width:750px;padding-top:10px;padding-bottom:10px;">	
+				<view  style="flex:1;justify-content: center;align-items: center;">
+					<text class="cencus-font">{{todayReclaimNum}}</text>
+					<text style="font-size:30px;">今日回收总数</text>
+				</view>
+				<view style="flex:1;justify-content: center;align-items: center;">
+					<text class="cencus-font">{{historycensusNum}}</text> 
+					<text style="font-size:30px;">历史回收数</text>
+				</view>
+			</view>
+			<view class="input-row flexbetween border-bottom">
+					<view class="flexaround paddingimage" @click="showSelect('deptSelect')" style="flex:2;align-items: center;">
+						<input style="height:60px;flex:1;" type="text" @focus="showSelect('deptSelect')" v-model="dept" placeholder="科室" @input="onsearchdept($event)"></input>
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexaround paddingimage" @click="showSelect('stateSelect')" style="flex:1;align-items: center;margin-right:10px;margin-left:10px;">
+						<text style="flex:1;height:60px;line-height:60px;font-size:35px;">{{state.hstype_name}}</text>
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexcenter paddingimage" style="flex:none;width:200px;align-items: center;">
+						<input v-model="selectTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange" placeholder="日期" />
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+			</view>
+			<view style="flex:1;">
+				<scroller class="scroller"   @loadmore="scrolltoBottom" :loadmoreoffset="20">
+					<view v-for="(list,indextop) in censusList" :key="indextop">
+						<view class="border-bottom" style="flex-direction: row;padding:20px;">
+							<text style="font-size:30px;">{{list[0]}}</text>
+							<text style="font-size:30px;">(包数量({{list[1].length}}))</text>
+						</view>					
+					   <reclaimItem  :item="item" v-for="(item,index) in list[1]" :key="index"></reclaimItem>
+					
+					</view>
+					
+				</scroller>
+				<!-- <loadingmore v-if="censusList.length" :loadingType="loadingType"></loadingmore> -->
+ 
+			</view>
+			<scrollerComponent 
+			:showpleaseSlect="true"
+			:listshow="deptSelect"
+			@chose="onChoosedept"
+			:width="'400'"
+			:height="'350'"
+			:left="'20'"
+			:top="'280'"
+			:dataList="kslist" 
+			:lable="'de_deptname'"></scrollerComponent>
+			<scrollerComponent 
+			:listshow="stateSelect" 
+			@chose="onChooseState"  
+			:width="'220'" 
+			:height="'300'" 
+			:left="'300'" 
+			:top="'280'" 
+			:dataList="stateList" 
+			:lable="'hstype_name'"></scrollerComponent>
+		    <wxc-loading :show="loading"></wxc-loading>	
+	
+	</view>
+</template>
+
+<script>
+	import scrollerComponent from '../../_mods/scroller.nvue';
+	// import loadingmore from '../../_mods/loading-more.nvue';
+		import { WxcLoading} from 'weex-ui';
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {formatDate} from "../../../common/tool.js";
+	import reclaimItem from "./reclaim-list-item.nvue";
+	import * as _ from '../../../common/lodash.min.js';
+	import {
+		getTocensus
+	} from "../../../common/api.js";
+	import {
+		myMixin
+	} from "../../../common/mixins.js";
+	
+	export default {
+		props:{'todayReclaimNum':String},
+		mixins: [myMixin],
+		components: {scrollerComponent,reclaimItem,WxcLoading},
+	
+		data() {
+			return {
+				deptSelect:false,
+				stateSelect:false,
+				kslist:[],
+				stateList:[{hstype_name:'全部',aaa102:''},{hstype_name:'使用',aaa102:'1'},{hstype_name:'过期',aaa102:'2'},{hstype_name:'不合格',aaa102:'3'},{hstype_name:'其它',aaa102:'4'}],
+				state:{hstype_name:'全部',aaa102:''},
+				dept:'',
+				deptId:'',
+				deptlist:[],
+				loading:false,
+				selectTime:formatDate(new Date(),"yyyy-MM-dd"),
+				historycensusNum:0,
+				censusList: [],
+				loadingType:2,
+			
+			
+			
+			   chosePack:{},
+	
+				// todaycensusNum:25,
+				
+				
+				page:1,
+				pageSize:20,
+				
+			
+				
+			   
+// 				startDt:'',
+// 				endDt:'',
+				
+				// initTime:formatDate(new Date(),"yyyy-MM-dd"),
+				
+			}
+		},
+		created(){
+		
+// 			console.log(this.todaycensusNum);
+// 			for(var i=0;i<30;i++){
+// 				this.censusList.push(['key',[{'bmc':'cehsisfdasd','hstype_name':'已过期','tmid':'fafasdfasd','qx_num':'fdsfsad'}]])
+// 			}
+			storage.getItem('loginForm', event => {
+			  this.loginForm = JSON.parse(event.data);
+			  this.getTocensus();
+			
+			})
+			storage.getItem('deptlist', event => {
+			  this.deptlist=JSON.parse(event.data);
+			  this.searchList('')
+			})
+		},
+		methods:{
+				closeSelectx(){
+				console.log('bug测试');
+			},
+			datechange(){
+				console.log(this.selectTime);
+				this.getTocensus();
+			},
+			closeSelect(){
+				this.deptSelect=false;
+				this.stateSelect=false;
+			},
+			showSelect(name) {
+				if (name != "deptSelect") {
+					this.deptSelect = false;
+				}
+				if (name != "stateSelect") {
+					this.stateSelect = false;
+				}
+				setTimeout(() => {
+					this[name] = !this[name];
+				}, 20)
+			
+			},
+			onChooseState(item){
+				this.stateSelect=false;
+				if(this.state==item){
+					return;
+				}
+				this.state=item;
+				// this.hs_type=item.aaa102;
+				this.censusList=[];
+				this.getTocensus();
+			},
+			getTocensus(){
+				this.loading=true;
+				const data={
+					"Tmxx":
+					{"bnrList":[],
+					"start_dt_hs":this.selectTime+" 00:00:00",
+					"end_dt_hs":this.selectTime+" 23:59:59",
+					"hs_did":this.deptId,//当前登录科室
+					"hs_type":this.state.aaa102,//全部空
+					"isChecked":false,
+					"jsList":[],
+					"zjFfList":[]},
+					"PageReq":{"page":"","rows":""},
+					"LoginForm":this.loginForm};
+					getTocensus(data).then(res=>{
+						this.loading=false;
+						
+							
+							if(res.errorCode == "0"){
+								this.historycensusNum=res.returnValue.zsl;
+								
+								if(!res.returnValue.rows.length){
+									modal.toast({message: '未查询到相关记录'});
+								}
+								
+								let usefuldata=res.returnValue.rows.map(element=>{
+									return {bmc:element.bmc,hstype_name:element.hs_type=="3"?"不合格":element.hs_type=="2"?"已过期":element.hs_type=="1"?"已使用":'其它',tmid:element.tmid,hs_dname:element.hs_dname};
+								})
+								
+								
+								this.censusList=this.buildlistBydept(usefuldata);
+							}
+							
+						
+					}).catch((e)=>{
+					   this.loading=false;
+				    })
+			},
+			buildlistBydept(list){
+				let deptnames=list.map((item)=>{
+					return item.hs_dname;
+				});
+			
+				let unquname=_.uniq(deptnames);
+			
+				let afterbuildList=[];
+				unquname.forEach(item=>{
+					let templist=list.filter((element)=>{
+						return item==element.hs_dname;
+					})
+					let templist2=[];
+					templist2[0]=item;
+					templist2[1]=templist;
+					afterbuildList.push(templist2);
+				})
+						
+				return afterbuildList;
+				
+			},
+			onChoosedept(item){
+				this.deptSelect=false;
+				if(item!=null&&this.deptId==item.de_deptid){
+					return;
+				}
+				this.censusList=[];
+				this.dept=item?item.de_deptname:'';
+				this.deptId=item?item.de_deptid:'';
+				this.getTocensus();
+			},
+			onsearchdept(e){
+				this.deptSelect=true;
+				this.stateSelect=false;
+				this.searchList(e.value);
+			},
+			searchList(e) {
+				this.searchDeptsthrottle(e, this.deptlist).then(res => {
+					this.kslist = res;
+				}).catch((e)=>{
+					console.log(e);
+				})
+			},
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+<style scoped>
+	.cencus-font{
+		font-size: 80px;
+			color: #FFA613;
+	}
+
+</style>

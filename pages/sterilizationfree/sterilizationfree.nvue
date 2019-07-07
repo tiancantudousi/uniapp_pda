@@ -1,0 +1,440 @@
+<template>
+	<view class="maincontent">
+		<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+		<view class="home-content" style="position:relative;">
+			<!-- 单独header组件 -->
+			<navhearder @stepClick="" :buttonList="[activeMachine.dev_name]" :loginForm="loginForm"></navhearder>
+			<text v-if="selfdetailList.length&&activeMachine!='1'" style="position:absolute;top:-25px;right:25px;font-size:40px;color:white" @click.stop="showpotChange=true"> 
+				换锅
+			</text>
+			<view class="flexbetween input-row border-bottom"> 
+			    <text class="samesize">日锅次:{{activeMachine.d_gc}}</text>
+				<text class="samesize">总锅次:{{activeMachine.t_gc}}</text>
+					<text style="color:black;font-size:35px;margin-left:10px;" v-if="activeMachine.type=='1'">BD</text>
+				 <view class="flexaround paddingimage" style="width:375px;" >			
+						<input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="tmid" return-key-type="search" placeholder="请录入包条码" @return="onSearch()"></input>
+				</view>
+			</view>
+			<view class="program"  v-if="programList.length">
+				<view class="program-item" style="justify-content: center;align-items: center;" :class="[index==activeindex?'activeprogram':'']" v-for="(item,index) in programList"   @click.stop="choseprogram(index)" :key="index">
+					<text style="font-size:35px" :class="[index==activeindex?'colorwhite':'colorblack']" >{{item.aaa103}}</text> 
+					<text style="font-size:35px" class="bottom-text" :class="[index==activeindex?'colorwhite':'colorblack']" >{{item.aaa106}}分</text>
+				</view>
+			</view>
+			<view class="split"></view>
+
+            <scrollListItem  v-if="selfdetailList.length" :item="{'bmc':'包名称','tmid':'条码号','cre_dt':'时间'}"></scrollListItem>
+			<scroller class="scroller" style="flex:1;width:750px;">
+					<scrollListItem  v-if="selfdetailList.length" v-for="(item,index) in selfdetailList" :key="index" :item="item"></scrollListItem>
+			</scroller>
+			<view class="one-button flexcenter" v-if="machineState!='update'&&(selfdetailList.length||activeMachine.type=='1')" @click.stop="startsterilization">
+			   
+				<text class="same-button">开始灭菌({{selfdetailList.length}})</text>
+			</view>
+			<view class="one-button flexcenter" v-if="machineState=='update'" @click="update">
+			   
+				<text class="same-button">确认修改</text>
+			</view>
+	<!-- 		<view class="start-wash flexcenter" v-if="selfdetailList.length&&machineState!='update'" @click.stop="startwash">
+				开始清洗({{packTotal}})
+			</view>
+			<view class="start-wash flexcenter" v-if="machineState=='update'" @click.stop="update">
+				确认修改
+			</view> -->
+	
+			<potchange v-if="showpotChange" @onClosetemp="showpotChange=false" :washstate="'prepare'"></potchange>
+
+
+
+		</view>
+				<wxc-dialog :title="''"
+		            :content="cancletmid"
+		            :show="showdialog"
+		            @wxcDialogCancelBtnClicked="showdialog=false"
+		            @wxcDialogConfirmBtnClicked="docancletmid"
+		          ></wxc-dialog>
+		<wxc-loading :show="loading"></wxc-loading>
+
+	</view>
+</template>
+
+
+<script>
+	let timer;
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {
+		WxcLoading,
+		WxcDialog
+	} from 'weex-ui';
+	import Navhearder from '../_mods/navhearder.nvue';
+	// import loadingmore from '../_mods/loading-more.nvue';
+	import scrollListItem from '../sterilization/components/scroll-list-item.nvue';
+	import potchange from '../sterilization/components/potchange.nvue';
+		import {formatDate} from "../../common/tool.js";
+
+	
+	// import reclaimDetail from "../reclaim/components/reclaim-detail.nvue";
+
+
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	import * as _ from '../../common/lodash.min.js';
+	import {
+		docancletmid,
+		inputbarcode,
+		publicSelect,
+		// addpack,
+		startsterilization,
+		getSystemTime,
+		updatesterilization
+		
+	} from "../../common/api.js";
+
+
+
+	export default {
+		mixins: [myMixin],
+		components: {
+			Navhearder,
+			WxcLoading,
+			scrollListItem,
+			potchange,
+			WxcDialog
+		},
+		data() {
+			return {
+				washList:[],
+				packSelect:false,
+				bid:'',
+				packId:'',
+				timer:'',
+				packlist:[],
+				programList:[],
+				machineState:'',
+				activeMachine:{},
+				updateProId:'',
+				packTotal:0,
+				selfdetailList:[],
+				showpotChange:false,
+				activeindex:-1,
+				cancletmid:'',
+				showdialog:false,
+				tmid:'',
+				
+// 				loadingType:2,
+// 				page:1,
+// 				pageSize:20,
+				loading: false,
+
+				loginForm: {},
+			}
+		},
+
+		created() {
+			this.setbarheight();
+           
+			this.linsentBarCode(this.judgeScanType)
+	        storage.getItem('sterilizationdetailList', event => {
+				console.log('sterilizationdetailList')
+				console.log(event.data)
+				this.selfdetailList = JSON.parse(event.data);
+			})
+// 			storage.getItem('sterilizationmachineList', event => {
+// 				console.log('sterilizationmachineList')
+// 				console.log(event.data)
+// 				this.selfdetailList = JSON.parse(event.data);
+// 				this.countpackTotal();
+// 			})
+			storage.getItem('activeSterililzationmachine', event => {
+				this.activeMachine = JSON.parse(event.data);
+				 storage.getItem('sterilizationpotionid', event => {
+					 if(event.data=="update"){
+						  this.machineState=event.data;
+						  this.updateProId=this.activeMachine.proc_id;
+					}
+				})
+			})
+			
+			storage.getItem('loginForm', event => {
+				this.loginForm = JSON.parse(event.data);
+				this.getsterilizationProgram();
+			    // this.selfdetailList=clone(this.detailList);
+			    
+			})
+			this.linsentBarCode(this.entertmid)
+			
+		},
+  
+		methods: {
+			onSearch(){
+				if(this.tmid==''){
+					modal.toast({message: "包条码不能为空"});
+					return;
+				}
+			    this.entertmid(this.tmid);
+			},
+			entertmid(e){
+				let reg=new RegExp('^(TM|tm)');
+				if(reg.test(e)){//包扫码
+					this.tmid = e.slice(2,e.length);
+				}
+				this.inputbarcode();
+			},
+			inputbarcode(){
+				const data={"MjDtl":{"d_gc":this.activeMachine.d_gc,"dev_id":this.activeMachine.dev_id,"t_gc":this.activeMachine.t_gc,"tmid":this.tmid},"LoginForm":this.loginForm};
+				inputbarcode(data).then(res=>{
+					if(res.errorCode=="0"){
+						modal.toast({message: "条码录入成功"});
+						let temppack=res.returnValue.MjDtlList.map(element=>{
+							return {tmid:element.tmid,bmc:element.bmc,'cre_dt':element.cre_dt}
+						})
+						this.selfdetailList=temppack.concat(this.selfdetailList);
+						this.tmid='';
+					}
+					if(res.status=="error"){
+						modal.toast({message:res.message});
+					}
+					if(res.status=="warn"){
+						this.showdialog=true;
+						this.cancletmid=res.message;
+					}
+				
+			
+				});
+			},
+			docancletmid(){
+				this.showdialog=false;
+				const data={"MjDtl":{"cre_uid":this.loginForm.userId,"cre_uname":this.loginForm.userName,"tmid":this.tmid},"LoginForm":this.loginForm};
+				docancletmid(data).then(res=>{
+					console.log(res,'撤销条码');
+					if(res.errorCode=="0"){
+						modal.toast({message:'撤销成功'});
+						this.selfdetailList=this.selfdetailList.filter(item=>{
+							return item.tmid!=this.tmid;
+							this.tmid='';
+						})
+					}else{
+						modal.toast({message:res.message});
+					}
+				})
+			},
+			
+			
+			
+			
+			
+			
+			
+		
+	
+			async update(){
+				this.loading=true;
+			
+				const datatime={"LoginForm":this.loginForm};
+				let time=await getSystemTime(datatime);
+			    let sys=time.returnValue.ServerInfo.systemtime;
+				let jgms=this.countjgms(sys,this.activeMachine.start_dt,this.activeMachine.plan_time);
+				const data={"Mj":
+				{"did":this.loginForm.deptId,
+				"jgms":jgms,
+				"cre_dt":formatDate(new Date(),"yyyy-MM-dd hh:mm:ss"),
+				"type":this.activeMachine.type,
+				"sb_type":this.activeMachine.sb_type,
+				"state":this.activeMachine.state,
+				"state_name":this.activeMachine.state_name,
+				"d_gc":this.activeMachine.d_gc,
+				"dev_id":this.activeMachine.dev_id,
+				"dev_name":this.activeMachine.dev_name,
+				"end_dt":this.activeMachine.end_dt,
+				"id":this.activeMachine.id,
+				"cre_uid":this.loginForm.userId,
+				"cre_uname":this.loginForm.userName,
+				"plan_time":this.programList[this.activeindex].aaa106,
+				"proc_id":this.programList[this.activeindex].aaa102,
+				"proc_name":this.programList[this.activeindex].aaa103,
+				"start_dt":this.activeMachine.start_dt,
+				"t_gc":this.activeMachine.t_gc},"LoginForm":this.loginForm};
+				updatesterilization(data).then(res=>{
+					this.loading=false;
+					if(res.errorCode=="0"){
+						 uni.postMessage({key: "updatesterilizationmachine",value:this.activeMachine});
+						uni.navigateBack({
+							delta: 2
+						});
+						
+					}
+				}).catch((error)=>{this.loading=false;})
+				
+			},
+			countjgms(sys,start,plan){
+				start = start.replace(new RegExp("-","gm"),"/");
+				sys=sys.replace(new RegExp("-","gm"),"/");
+				
+				let leftTime =Number(plan)*60*1000-((new Date(sys)).getTime()-(new Date(start)).getTime()); //得到毫秒数
+				return Math.floor(leftTime/1000);
+			},
+			choseprogram(index){
+				this.activeindex=index;
+			},
+			startsterilization(){
+				// console.log(this.activeMachine);
+				if(this.activeindex==-1){
+					modal.toast({message: "请选择灭菌程序"});
+					return;
+				}
+				if(this.activeMachine.type!='1'&&this.selfdetailList.length==0){
+					modal.toast({message: "请录入包条码"});
+					return;
+				}
+				this.loading=true;
+					const data={"Mj":{
+					"is_inv":"1",
+					"did":this.loginForm.dev_id,
+					"sb_type":this.activeMachine.sb_type,
+					"state":this.activeMachine.state,
+					"state_name":this.activeMachine.state_name,
+					"d_gc":this.activeMachine.d_gc,
+					"dev_id":this.activeMachine.dev_id,
+					"dev_name":this.activeMachine.dev_name,
+					"plan_time":this.programList[this.activeindex].aaa106,
+					"proc_id":this.programList[this.activeindex].aaa102,
+					"proc_name":this.programList[this.activeindex].aaa103,
+					"type":this.activeMachine.type,
+					"t_gc":this.activeMachine.t_gc},"LoginForm":this.loginForm};
+					console.log('startsterilization');
+					console.log(JSON.stringify(data));
+					startsterilization(data).then(res=>{
+						// console.log(res,"开始清洗");
+						this.loading=false;
+						if(res.errorCode=="0"){
+							 uni.postMessage({key: "sterilizationmachine",value:this.activeMachine});
+							// this.$bus.emit('refreshItem',this.activeMachine);
+							uni.navigateBack({
+								delta: 1
+							});
+						}else{
+							modal.toast({message: res.message});
+						}
+					}).catch((error)=>{this.loading=false;})
+			},
+
+			getsterilizationProgram(){
+				const data={"AA10":{"aaa100":"MJCX"},"LoginForm":this.loginForm};
+				publicSelect(data).then(res=>{
+					 if(res.errorCode=="0"){					
+						this.programList=res.returnValue.AA10List;
+						  if(this.machineState=="update"){
+							 this.activeindex=_.findIndex(this.programList,{aaa102:this.updateProId})
+						  }
+					}
+				})
+			},
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style scoped>
+	.colorwhite{
+		color:white;
+		font-size:35px
+	} .colorblack{
+		color:black;
+		font-size:35px
+	}
+		.same-button{
+		   font-size:45px;
+		  /* text-align: center; */
+		   color:white;
+		/*   height:90px;
+		   line-height:90px; */
+		  
+	}
+	.one-button{
+		
+		   background-color: #0080FF;
+		  flex:none;
+		   width:750px;
+		   height:90px;
+		   align-items: center;
+		   justify-content: center;
+		 /*  flex-direction: row; */
+	}
+	.washfree-main-noplate{
+		flex:1;
+		align-items: center;
+		justify-content: center;
+	
+	}
+	.noplate-text{
+		margin-top:50px;
+		font-size: 33px;
+		color: #A5A5A5;
+	}
+	.start-wash{
+		flex:none;
+		background: #0080FF;
+		font-size: 38upx;
+		color: #FFFFFF;
+		height:100px;
+	}
+	.split{
+		background-color: #F3F3F3;
+		height:20px;
+		width:750px;
+		flex:none;
+	}
+    .samesize{
+			font-size:33px;
+			color:#A5A5A5;
+		}
+	.program{
+		display:flex;
+		flex-direction: row;
+		flex:none;
+		justify-content: space-around;
+		flex-wrap: wrap;
+		width:750px;
+		padding: 20px 30px 20px 30px;
+
+		
+	}
+	.activeprogram{
+	
+		background-color: #0080FF;
+	}
+	.bottom-text{
+		color:white;
+	}
+	.program-item{
+		display:flex;
+		flex-direction: row;
+	
+		flex-direction: column;
+		justify-content: center;
+		width:210px;
+		margin:10px;
+		border-color:#0080FF;
+		border-width:2px;
+	/* 	border: 1upx solid #0080FF; */
+		border-radius: 8px;
+		height:92px;
+		padding:10px 0 10px 0;
+		
+	}
+	.bottom-text{
+		font-size: 25px;
+		color: #A5A5A5;
+	}
+	.program-item.active{
+		border-color:#D2D2D2;
+		border-width:2px;
+		color:#D2D2D2;
+	}
+	
+	
+	
+	
+	
+</style>

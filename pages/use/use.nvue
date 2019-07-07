@@ -1,0 +1,454 @@
+<template>
+	<view class="maincontent">
+		<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+		<view class="home-content">
+			
+			<!-- 单独header组件 --> 
+			 <navhearder @stepClick="stepClick" :buttonList="buttonList"  :loginForm="loginForm"></navhearder>
+			 <cencus v-if="activeIndex==1" @showdetail="showdetail"></cencus>
+			 <view style="width:750px;flex:1;" v-if="activeIndex==0">
+				 <view class="flexaround input-row border-bottom">
+				 	<input class="input" type="text" v-model="patient" placeholder="请录入病人编号" @return="judgeScanType(patient,onpersonEnter)" ></input>
+				 	<input class="input" type="text" v-model="tmid" placeholder="请录入包条码" @return="tmidenter"></input>
+				 </view>
+				 <view class="main-list border-bottom">
+				 	<scroller class="scroller">
+				 		<view class="list-item border-bottom" style="padding:10px 0 10px 0" v-for="(item,index) in list">
+              <image  src="../../static/img/timg.jpg" style="width:110px;height:110px;padding:15px;" alt=""></image>
+				 			 <view class="item-content">
+				 				<text class="more-fontsize" style="word-break: break-all;">{{item.bmc}}</text>
+				 				 <view class="flexbetween wrap">
+				 						<text class="same-fontsize">{{item.tmid}}</text>
+				 						 <text class="same-fontsize">{{item.xq_desp}}</text>
+				 				 </view>
+								 <text class="same-fontsize">{{item.xq_end}}</text>
+				 			 </view>
+				 		</view>
+				 	</scroller>
+				 	
+				 </view>
+		
+				 <view class="flexaround" style="height:90px;position:relative;" v-if="patientInformation" @click="onPatitentDetail">
+				 
+				 	<text class="same-fontsize">{{patientInformation.p_bed_no?patientInformation.p_bed_no:''}}</text>
+					<text class="same-fontsize">{{patientInformation.p_name}}</text>
+					<text class="same-fontsize">{{patientInformation.p_sex=="1"?"男":"女"}}</text>
+					<text class="same-fontsize">{{patientInformation.p_age}}岁</text>
+					<image src="../../static/img/i-down1.png" class="image-down" style="transform: rotate(180deg);" alt=""></image>
+				 </view>
+				  <view class="flexcenter" style="height:90px;" v-if="!patientInformation">
+				 
+				 	<text class="same-fontsize">请录入病人信息</text>
+				 		
+				 </view>
+				<div class="cover-content" style="" v-if="showpatitentDetail"> 
+			         	 <view class="flexaround border-bottom" style="height:90px;position:relative;width:750px;" @click="onPatitentDetailclose"> 
+							<text class="same-fontsize" style="color:white;border-radius:20px;padding:10px;background-color: #0080FF;">{{patientInformation.p_bed_no?patientInformation.p_bed_no:''}}</text>
+							<text class="same-fontsize">{{patientInformation.p_name}}</text>
+							<text class="same-fontsize">{{patientInformation.p_sex=="1"?"男":"女"}}</text>
+							<text class="same-fontsize">{{patientInformation.p_age}}岁</text>
+							<image src="../../static/img/i-down1.png" class="image-down" style="transform: rotate(180deg);" alt=""></image>
+			            </view>
+						 <view class="flexaround input-row border-bottom">
+							<text class="same-fontsize" style="color: #A5A5A5;">执行医生</text>
+							<view class="flexaround">
+								<text class="same-fontsize" style="padding-right:20px;">{{patientInformation.surgery_uname}}</text>
+								<text class="same-fontsize">{{patientInformation.surgery_uid}}</text>
+							</view>
+						</view>
+						 <view class="flexaround input-row border-bottom">
+							<text class="same-fontsize" style="color: #A5A5A5;">病区</text>
+							<view class="flexaround">
+								<text class="same-fontsize" style="padding-right:20px;">{{patientInformation.dept_dname}}</text>
+								<text class="same-fontsize">{{patientInformation.dept_did}}</text>
+							</view>
+						</view>
+						 <view class="flexaround input-row border-bottom">
+							<text class="same-fontsize" style="color: #A5A5A5;">诊断</text>
+							<text class="same-fontsize">{{patientInformation.p_diag_desp}}</text>
+						
+						</view>
+				 
+				 </div>
+				 
+				 
+				 <wxc-dialog :title="'包条码：'+tmid"
+				             :content="messagecontent"
+				             :show="showdialog"
+				 			 @wxcDialogCancelBtnClicked="showdialog=false"
+				             @wxcDialogConfirmBtnClicked="dialogConfirmBtnClick"
+				  ></wxc-dialog>
+			 </view>
+			 <cencusDetail v-if="showdetailitem"  @closeDetail="showdetailitem=false" :item="activeitem"></cencusDetail>
+		</view>
+		
+	</view>
+</template>
+
+
+<script>
+	
+	 var modal = weex.requireModule('modal');
+	 const storage = weex.requireModule('storage');
+	 import { WxcMask,WxcDialog } from 'weex-ui';
+	  // import Category from '../_mods/category.nvue';
+	   import Navhearder from '../_mods/navhearder.nvue';
+	   import cencus from './components/cencus.nvue';
+	    import cencusDetail from "./components/cencus-detail.nvue";
+	   	import {
+	   getpatient,patientuse,deptuse,cancleuse
+	   } from "../../common/api.js";
+	   	import {
+	   	myMixin
+	   } from "../../common/mixins.js";
+	  
+
+		
+	export default {
+		mixins: [myMixin],
+		components: { WxcMask,Navhearder,WxcDialog ,cencus,cencusDetail},
+		data() {
+			return {
+				// tmid:'',
+				messagecontent:"已使用，是否撤销?",
+				showdialog:false,
+				// choseall:false,
+				statusBarHeight: '',
+				buttonList:['使用','统计'], 
+				activeIndex:0,
+				loginForm:{},
+				patient:'',
+				patientId:'',
+				tmid:'',
+				show:false,
+				list: [],
+				patientInformation:'',
+				showpatitentDetail:false,
+				showdetailitem:false,
+				activeitem:{}
+		
+			}
+		},
+		created() {
+		
+			this.setbarheight();
+			this.linsentBarCode(this.judgeScanType)
+			storage.getItem('loginForm', event => {
+			  this.loginForm = JSON.parse(event.data);
+			 // this.gettobeacept();
+			
+			})
+		
+		},
+			
+		methods: {
+			showdetail(item){
+				this.activeitem=item;
+				this.showdetailitem=true;
+			},
+			dialogConfirmBtnClick(){
+				this.cancleuse();
+				this.showdialog=false;
+			},
+			tmidenter(){
+				if(!this.tmid){
+					modal.toast({message: '请录入包条码'});
+					return;
+				}
+				if(this.patientInformation){
+					this.patientuse();
+				}else{
+					this.deptuse();
+				}
+			},
+			cancleuse(){
+					const data = {
+									"SyLog":{"dept_did":this.loginForm.deptId,
+									"dept_dname":this.loginForm.deptName,
+									"opt_uid":this.loginForm.userId,
+									"opt_uname":this.loginForm.userName,
+									"tmid":this.tmid},"LoginForm": this.loginForm
+								}
+					cancleuse(data).then(res => {
+								 if (res.errorCode == "0") {
+									console.log('cancleuse')
+									console.log(JSON.stringify(res))
+									modal.toast({message: '撤销成功'});
+									this.list=this.list.filter(item=>{
+										return item.tmid!=res.returnValue.Tmxx.tmid;
+									})
+									// this.patientInformation=res.returnValue.brList[0];
+								}
+							
+								if (res.status == "error") {
+									this.patientInformation='';
+									modal.toast({message: res.message});
+								}
+								
+				})
+			},
+			deptuse(){
+					const data = {
+					"SyLog":{"dept_did":this.loginForm.deptId,
+					"dept_dname":this.loginForm.deptName,
+					"opt_uid":this.loginForm.userId,
+					"opt_uname":this.loginForm.userName,
+					"tmid":this.tmid},"LoginForm": this.loginForm
+				}
+				
+				patientuse(data).then(res => {
+						console.log('deptuse')
+					console.log(JSON.stringify(res))
+				 if (res.errorCode == "0") {
+					 modal.toast({message: '使用成功'});
+					 let item=res.returnValue.Tmxx;
+					 let tempitem={bmc:item.bmc,tmid:item.tmid,xq_desp:item.xq_desp,xq_end:item.xq_end};
+				     this.list.push(tempitem);
+					// this.patientInformation=res.returnValue.brList[0];
+				}
+				if(res.status=="warn"){
+					this.showdialog=true;
+				}
+				if (res.status == "error") {
+					this.patientInformation='';
+					modal.toast({message: res.message});
+				}
+				
+			  })
+			},
+			onPatitentDetailclose(){
+				this.showpatitentDetail=false;
+			},
+			onPatitentDetail(){
+				this.showpatitentDetail=true;
+			},
+			patientuse(){
+					const data = {
+					"Brxx":this.patientInformation,
+						"SyLog":{"dept_did":this.loginForm.deptId,
+						"dept_dname":this.loginForm.deptName,
+						"opt_uid":this.loginForm.userId,
+						"opt_uname":this.loginForm.userName,
+						"tmid":this.tmid},"LoginForm": this.loginForm
+				}
+				patientuse(data).then(res => {
+						console.log('patientuse')
+					console.log(JSON.stringify(res))
+					if (res.errorCode == "0") {
+						modal.toast({message: '使用成功'});
+						let item=res.returnValue.Tmxx;
+					 let tempitem={bmc:item.bmc,tmid:item.tmid,xq_desp:item.xq_desp,xq_end:item.xq_end};
+						this.list.push(tempitem);
+						// this.patientInformation=res.returnValue.brList[0];
+					}
+						if(res.status=="warn"){
+						this.showdialog=true;
+					}
+					if (res.status == "error") {
+						this.patientInformation='';
+						modal.toast({message: res.message});
+					}
+					
+				})
+			},
+			
+			
+			
+			
+			
+			
+			
+			
+
+		
+		
+			judgeScanType(data,callback) {
+			
+				let reg = new RegExp('^(TM|tm)');
+				if (reg.test(data)) { //包扫码
+					this.tmid = data.substring(2, data.length).trim();
+					this.tmidenter();
+					return;
+				}
+				let personReg = new RegExp('^(BR|br)');
+				if (personReg.test(data)) { //人员扫码
+					this.patient = data.substring(2, data.length).trim();
+					this.onpersonEnter();
+					return;
+				}
+				if(callback){
+					callback();
+					return;
+				}
+				modal.toast({message: `该条码${data}不存在`});
+			},
+			onpersonEnter() {
+				if (!this.patient) {
+					modal.toast({message: '请输入病人编号'});
+					return;
+				}
+				this.getpatient();
+			},
+			getpatient() {
+				const data = {
+					"Brxx":{"mrn":this.patient},"LoginForm": this.loginForm
+				}
+				getpatient(data).then(res => {
+					if (res.errorCode == "0") {
+						console.log('getpatient')
+						console.log(JSON.stringify(res))
+						this.patientInformation=res.returnValue.brList[0];
+					}
+					if (res.status == "error") {						
+						modal.toast({message: res.message});
+					}
+					
+				})
+			},
+
+			setbarheight() { //设置状态栏高度
+				let _t = this;
+				setTimeout(() => { //获取状态栏高度，setTimeout后才能调用uni.  
+					uni.getSystemInfo({
+						success: function(res) {
+							_t.statusBarHeight = res.statusBarHeight;
+						}
+					});
+				}, 1);
+			},
+		
+			stepClick(index){
+					this.activeIndex=-1;
+			        setTimeout(()=>{this.activeIndex=index;},1)
+			},
+		}
+	}
+</script>
+
+<style>
+	
+	.cover-content {
+		height: 400px;
+		width: 750px;
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		background-color: #FFFFFF;
+		border-top-left-radius:20px;
+	    border-top-right-radius: 20px;
+		display:flex;
+		align-items: center;
+		border-top-width:2px;
+		border-top-style: solid;
+		border-color: #E5E5E5;
+		/* border-radius: 10px; */
+	/* 	border-radius: 50px 50px 0 0; */
+	}
+	.content {
+	  padding: 30px;
+	}
+	
+
+	/* 通用css */
+	.flexnone{
+		flex:none;
+	}
+	.wrap{
+		flex-wrap: wrap;
+	}
+	.flexaround{
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-around;
+	}
+	.flexcenter{
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+	}
+	.flexbetween{
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+	.maincontent {
+		display: flex;
+		flex: 1;
+		width: 750px;
+		flex-direction: column;
+	}
+	.home-content{
+		/* background-color: red; */
+		flex:1;
+		width:750px;
+		position:relative;
+	}
+	.border-bottom{
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+	.input-row{
+		height:90px;
+		width:750px;
+		padding:0 25px;
+	}
+  /* 通用css */
+  .input{
+	  width:350px;
+	  height: 150px;
+  }
+  .main-list{
+	 
+	 flex:1;
+   }
+   .activeborder{
+	   border-width:2px;
+	   border-color:#C7C7CC;
+   }
+   .checkimage-view{
+	   width:70px;
+	   height:70px;
+	   border-radius: 50%;
+   } 
+   .check-image{
+	  flex:1;
+   }
+   .item-content{
+	   
+	   flex:1;
+
+   }
+   
+   .list-item{
+	   padding:0 20px;
+	   flex-direction: row;
+	   align-items: center;
+   }
+   .more-fontsize{
+	  font-size:40px;
+   }
+   .same-fontsize{
+	   font-size:35px;
+   }
+   .bottom-button{
+	   width:750px;
+	   height:90px;
+	   flex-direction: row;
+   }
+   .same-button{
+	   font-size:45px;
+	   text-align: center;
+	   flex:1;
+	   color:white;
+	   height:90px;
+	   line-height:90px;
+	   background-color: #0080FF;
+   }
+   .gray{
+	   background-color:gray;
+   }
+    .image-down {
+   	width: 30px;
+   	height: 15px;
+   }
+</style>

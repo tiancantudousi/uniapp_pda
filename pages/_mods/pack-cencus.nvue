@@ -1,0 +1,160 @@
+<template>
+	<view style="flex:1" @click="closeAllselect">
+		   
+			<view class="input-row flexbetween border-bottom">
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="startTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('start')" placeholder="日期" />
+            <image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="endTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('end')" placeholder="日期" />
+						 <image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+			</view>
+			
+
+			<cencusItem   :item="{'bmc':'包名称','pb_num':'包数量'}" :key="aaaa"></cencusItem>	
+			<scroller class="scroller" style="flex:1;width:750px;" @loadmore="scrolltoBottom" :loadmoreoffset="20">
+				<cencusItem v-for="(item,index) in packcensusreList" @showdetail="showdetail" :item="item" :key="index"></cencusItem>	
+				<loadingmore v-if="packcensusreList.length" :loadingType="loadingType"></loadingmore>
+			</scroller>
+		  
+		   <wxc-loading :show="loading"></wxc-loading>		
+	</view>
+</template>
+
+<script>
+	
+	
+	import loadingmore from './loading-more.nvue';
+	import cencusItem from './packcensus-list-item.nvue';
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {formatDate} from "../../common/tool.js";
+	
+	// import * as _ from '../../../common/lodash.min.js';
+	import {WxcLoading} from 'weex-ui';
+	import {
+		getpackcensuscensusList,getcomposiecensus
+	} from "../../common/api.js";
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	import {
+		datewarnmixins
+	} from "../../common/datewarnmixins.js";
+	
+	export default {
+		mixins: [myMixin,datewarnmixins],
+		components: {WxcLoading,loadingmore,cencusItem},
+	
+		data() {
+			return {
+				
+				page:1,
+				pageSize:20,
+      
+				loading:false,
+				startTime:formatDate(new Date(),"yyyy-MM-dd"),
+				endTime:formatDate(new Date(),"yyyy-MM-dd"),
+				loadingType:2,
+			    loginForm:{},
+				packcensusreList:[],
+				pagestate:''
+				
+			}
+		},
+		created(){
+			this.getsystime().then(res=>{
+				this.startTime=res.slice(0,11);
+				this.endTime=res.slice(0,11);
+				storage.getItem('loginForm', event => {
+				  this.loginForm = JSON.parse(event.data);
+				
+				  storage.getItem('packcencus', event => {
+				    this.pagestate = event.data;
+				    this.getcensusbypage();
+				  })
+				})
+			})
+
+
+		},
+		methods:{
+			showdetail(item){
+				Object.assign(item,{},{startTime:this.startTime,endTime:this.endTime})
+				this.$emit('showdetail',item)
+			},
+			datechange(timestate){
+				
+				if(this.warningdate({'start':this.startTime,'end':this.endTime})){
+					timestate=='end'?modal.toast({message:'结束时间不得小于开始时间！'}):modal.toast({message:'开始时间不得大于结束时间！'});
+					return;
+				}
+			    this.initparmas();
+				this.getcensusbypage();
+			},
+			initparmas(){
+				this.packcensusreList=[];
+				this.page=1;
+			},
+
+				
+						
+						
+						getcensusbypage(){
+							this.loading=true;
+							const data={"Tmxx":{"end_dt_pb":this.endTime+" 23:59:59","isChecked":false, "start_dt_pb":this.startTime+" 00:00:00"},"PageReq":{"page":this.page,"rows":this.pageSize},"LoginForm":this.loginForm};
+							if(this.pagestate=="pack"){
+								getpackcensuscensusList(data).then(res=>{
+									this.loading=false;
+									 if(res.errorCode=="0"){
+										 this.loadingType=res.returnValue.rows.length<this.pageSize?2:0;
+										 if(this.page==1&&!res.returnValue.rows.length){
+										 	modal.toast({message:'未查询到相关记录!'})
+										 }
+										this.packcensusreList=this.packcensusreList.concat(res.returnValue.rows);
+									}
+								
+								})
+							}else{
+								const data={"Tmxx":{"end_dt_db":this.endTime+" 23:59:59","isChecked":false, "start_dt_db":this.startTime+" 00:00:00"},"PageReq":{"page":this.page,"rows":this.pageSize},"LoginForm":this.loginForm};
+								getcomposiecensus(data).then(res=>{
+		
+									this.loading=false;
+									 if(res.errorCode=="0"){
+										 this.loadingType=res.returnValue.rows.length<this.pageSize?2:0;
+										 if(this.page==1&&!res.returnValue.rows.length){
+										 	modal.toast({message:'未查询到相关记录!'})
+										 }
+										this.packcensusreList=this.packcensusreList.concat(
+												res.returnValue.rows.map((element)=>{
+													return {bmc:element.bmc,pb_num:element.db_num,bid:element.bid}
+												})
+										)
+									}
+								
+								})
+							}
+						},
+						
+						scrolltoBottom(){
+							this.page++;
+						    this.loadingType=1;
+							this.getcensusbypage();
+						},
+			
+
+			
+			
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style scoped>
+	.cencus-font{
+		font-size: 80px;
+			color: #FFA613;
+	}
+
+</style>

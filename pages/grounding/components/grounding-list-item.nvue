@@ -1,0 +1,105 @@
+<template>
+	<view style="width:750px;" class="list-item border-bottom">
+		<view class="checkimage-view" v-if="item.checked!=undefined" :class="[!item.checked?'activeborder':'']" @click="onChoseItem(item)" > 
+			<image src="../../static/img/i-ok.png" v-if="item.checked" class="check-image"></image>
+		</view>
+		 <image src="../../static/img/timg.jpg" class="timg-image"  alt=""></image>
+		 <view class="item-content">
+			 <view style="flex-direction: row;align-items: center;">
+				 <text class="more-fontsize" style="flex:1;">{{item.bmc}}</text> 
+			 </view>
+			  <view class="flexbetween" style="flex-direction: row;align-items: center;flex:1;">
+					<text class="same-fontsize" style="flex:1;">{{item.tmid}}</text>
+					<text class="same-fontsize">保质期{{item.xq_desp}}</text>	
+		      </view>
+			   <view  >
+			  		<text class="same-fontsize">{{item.mj_start_dt}}</text>	
+			  </view>
+		 </view>
+	</view>
+</template>
+
+<script>
+	export default {
+		props:['item'],
+		methods:{
+			onChoseItem(item){
+				item.checked=!item.checked
+				this.$emit('onChoseItem', item);
+				
+			}
+		}
+	}
+</script>
+
+<style>
+	  .activeborder{
+		   border-width:2px;
+		   border-color:#C7C7CC;
+	}
+	  .checkimage-view{
+		   width:60px;
+		   height:60px;
+		   border-radius: 50%;
+	} 
+	 .check-image{
+		   flex:1;
+	}
+	 .border-bottom{
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+ 
+  
+   .timg-image{
+	 width:150px;
+	 height:150px;
+	 padding:15px;
+	 flex:none;
+   }
+   .item-content{
+	   
+	   flex:1;
+   }
+   
+   .list-item{
+	   padding:0 20px;
+	   flex-direction: row;
+	   align-items: center;
+   }
+   .more-fontsize{
+	  font-size:40px;
+   }
+   .same-fontsize{
+	   font-size:35px;
+   }
+ 
+
+   .gray{
+	   background-color:gray;
+   }
+    .item-state{
+		font-size: 30px;
+		flex:none;
+		border-radius: 100px;
+		padding:10px 20px;
+		box-sizing: content-box;
+   }
+   .overdue{
+   				 color: #E48E39;
+   				 background-color:rgba(245,166,35,0.2);
+   } 
+   .used{
+   				 color:#A5A5A5;
+   				 background-color:rgba(165,165,165,0.2);
+   				
+   } 
+   .unqualified{
+   				 background-color:rgba(255,120,139,0.2);
+   				 color: #F4333C;
+   }
+   .other{
+	    background-color:black;
+	   color: white;
+   }
+</style>

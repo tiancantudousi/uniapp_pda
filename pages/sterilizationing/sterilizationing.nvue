@@ -1,0 +1,436 @@
+<template>
+	<view class="maincontent">
+		<view class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></view>
+		<view class="home-content" style="position:relative;">
+			<!-- 单独header组件 -->
+			<navhearder @stepClick="" :buttonList="[activeMachine.dev_name]" :loginForm="loginForm"></navhearder>
+			<text v-if="selfdetailList.length" style="position:absolute;top:-25px;right:25px;font-size:40px;color:white"
+			 @click.stop="showpotChange=true">
+				换锅
+			</text>
+			<view class="flexcenter">
+				<view class="program-detail border-all flexbetween">
+					<view class="left">
+						<text class="left-first">{{start}}</text>
+						<text class="left-last">{{activeMachine.proc_name}} &nbsp;&nbsp;{{activeMachine.plan_time}}分</text>
+					</view>
+					<view class="right" style="flex-direction: row;">
+          <image class="right-img" src="../../static/img/i-time1.png" alt=""></image>
+						<text class="right-text">{{activeMachine.countdown}}</text>
+					</view>
+				</view>
+			</view>
+
+
+			<view class="split"></view>
+
+
+			<scroller class="scroller" style="flex:1;width:750px;">
+				<scrollListItem v-if="selfdetailList.length" v-for="(item,index) in selfdetailList" :key="index" :item="item"></scrollListItem>
+			</scroller>
+			<view class="bottom-button">
+				<text class="same-button" style="flex:1;border-style: solid;border-right-width: 2px;border-color: white;"
+				 @click.stop="update">修改</text>
+				<text class="same-button" style="flex:1;" @click="showdialog=true">作废</text>
+			</view>
+
+			<potchange v-if="showpotChange" @onClosetemp="showpotChange=false" :washstate="'sterilizationing'"></potchange>
+
+
+
+		</view>
+				<wxc-dialog :title="''"
+		            :content="'是否作废该灭菌机?'"
+		            :show="showdialog"
+		            @wxcDialogCancelBtnClicked="showdialog=false"
+		            @wxcDialogConfirmBtnClicked="waste"
+		          ></wxc-dialog>
+		<wxc-loading :show="loading"></wxc-loading>
+
+	</view>
+</template>
+
+
+<script>
+	let timer;
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {
+		WxcLoading,
+		WxcDialog
+	} from 'weex-ui';
+	import Navhearder from '../_mods/navhearder.nvue';
+	// import loadingmore from '../_mods/loading-more.nvue';
+	import scrollerComponent from '../_mods/scroller.nvue';
+	import scrollListItem from '../sterilization/components/scroll-list-item.nvue';
+	import potchange from '../sterilization/components/potchange.nvue';
+	import {
+		formatDate
+	} from "../../common/tool.js";
+
+	// import reclaimDetail from "../reclaim/components/reclaim-detail.nvue";
+
+
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	import * as _ from '../../common/lodash.min.js';
+	import {
+		canclesterilization
+
+	} from "../../common/api.js";
+
+
+
+	export default {
+		mixins: [myMixin],
+		components: {
+			Navhearder,
+			WxcLoading,
+			scrollListItem,
+			WxcDialog,
+			// scrollerComponent,
+			potchange
+		},
+		data() {
+			return {
+				start: '',
+				activeMachine: {},
+				loading: false,
+				loginForm: {},
+				selfdetailList: [],
+				showdialog:false
+
+			}
+		},
+
+		created() {
+			this.setbarheight();
+			 storage.getItem('sterilizationdetailList', event => {
+				console.log('sterilizationdetailList')
+				console.log(event.data)
+				this.selfdetailList = JSON.parse(event.data);
+			})
+			storage.getItem('activeSterililzationmachine', event => {
+				this.activeMachine = JSON.parse(event.data);
+				this.onstatewashing(this.activeMachine);
+				this.start = this.activeMachine.start_dt.slice().substring(11, this.activeMachine.start_dt.length);
+			})
+
+			storage.getItem('loginForm', event => {
+				this.loginForm = JSON.parse(event.data);
+
+			})
+		},
+
+		methods: {
+
+			waste() {
+				this.showdialog=false
+				   let Mjdata={...this.activeMachine,"is_inv":"1"}
+				 const data={"Mj":Mjdata,"LoginForm":this.loginForm};
+					
+				canclesterilization(data).then(res=>{
+					if(res.errorCode=="0"){
+						modal.toast({message: '作废成功'});
+						 uni.postMessage({key: "sterilizationmachine",value:this.activeMachine});
+							uni.navigateBack({
+							delta: 1
+						});
+					}
+					if(res.status=="error"){
+						modal.toast({message: res.message});
+					}
+					
+				})
+			},
+			update() {
+				storage.setItem('sterilizationpotionid', 'update', event => {
+					uni.navigateTo({
+						url: '/pages/sterilizationfree/sterilizationfree'
+					});
+				})
+
+			},
+			async onstatewashing(item) {
+				let systime = await this.getsystime();
+				this.conutleftTime(item.start_dt, item.plan_time, systime, item);
+			},
+			conutleftTime(starttime, planTime, systime, item) {
+				starttime = starttime.replace(new RegExp("-", "gm"), "/");
+				const datatime = {
+					"LoginForm": this.loginForm
+				};
+				// let temptime=systime;
+				let systemtime = systime.replace(new RegExp("-", "gm"), "/");
+				let leftTime = Number(planTime) * 60 * 1000 - ((new Date(systemtime)).getTime() - (new Date(starttime)).getTime()); //得到毫秒数
+				console.log(leftTime);
+				let leftminute = {
+					"minute": leftTime < 60000 ? 0 : new Date(leftTime).getMinutes(),
+					"second": new Date(leftTime).getSeconds()
+				};
+				console.log('倒计时数据')
+				console.log(JSON.stringify(leftminute))
+				this.countdownfun(Number(leftminute.minute), Number(leftminute.second), item);
+			},
+			countdownfun(minute, seconds, item) {
+				console.log("开始倒计时");
+				let minutes = minute;
+				let timer = setInterval(() => {
+					if (seconds == 0 && minutes == 0) {
+						uni.postMessage({key: "sterilizationmachine",value:item});
+						
+						uni.navigateBack({
+							delta: 1
+						});
+						clearInterval(timer); //清除定时器
+						return;
+					}
+					seconds--;
+					if (seconds < 0) {
+						seconds = 59;
+						minutes--;
+					}
+					let minutess = minutes < 10 ? '0' + minutes : minutes;
+					let secondss = seconds < 10 ? '0' + seconds : seconds;
+					this.$set(item, 'countdown', minutess + ':' + secondss);
+				}, 1000)
+
+			},
+
+
+
+		}
+	}
+</script>
+<style src="../../common/base.css"></style>
+<style scoped>
+	.program-detail {
+		border-radius: 10px;
+		width: 720px;
+		height: 120px;
+		margin-top: 10px;
+		margin-bottom: 10px;
+		padding: 0 40px 0 40px;
+	}
+
+	.same-button {
+		font-size: 45px;
+		text-align: center;
+		color: white;
+		height: 90px;
+		line-height: 90px;
+		background-color: #0080FF;
+	}
+
+	.bottom-button {
+		width: 750px;
+		height: 90px;
+		flex-direction: row;
+	}
+
+	.left-first {
+		font-size: 33px;
+		color: #666666;
+	}
+
+	.left-last {
+		font-size: 29px;
+		color: #A5A5A5;
+	}
+
+	.right-img {
+		width: 58px;
+		height: 58px;
+	}
+
+	.right-text {
+		margin-left: 10px;
+		font-size: 58px;
+		color: #F5A623;
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	.washfree-main-noplate {
+		flex: 1;
+		align-items: center;
+		justify-content: center;
+
+	}
+
+	.noplate-text {
+		margin-top: 50px;
+		font-size: 33px;
+		color: #A5A5A5;
+	}
+
+	.start-wash {
+		flex: none;
+		background: #0080FF;
+		font-size: 38upx;
+		color: #FFFFFF;
+		height: 100px;
+	}
+
+	.split {
+		background-color: #F3F3F3;
+		height: 20px;
+		width: 750px;
+		flex: none;
+	}
+
+	.samesize {
+		font-size: 33px;
+		color: #A5A5A5;
+	}
+
+	.program {
+		display: flex;
+		flex-direction: row;
+		flex: none;
+		justify-content: space-around;
+		flex-wrap: wrap;
+		width: 750px;
+		padding: 20px 30px 20px 30px;
+
+
+	}
+
+	.activeprogram {
+
+		background-color: #0080FF;
+	}
+
+	.bottom-text {
+		color: white;
+	}
+
+	.program-item {
+		display: flex;
+		flex-direction: row;
+
+		flex-direction: column;
+		justify-content: center;
+		width: 210px;
+		margin: 10px;
+		border-color: #0080FF;
+		border-width: 2px;
+		/* 	border: 1upx solid #0080FF; */
+		border-radius: 8px;
+		height: 92px;
+		padding: 10px 0 10px 0;
+
+	}
+
+	.bottom-text {
+		font-size: 25px;
+		color: #A5A5A5;
+	}
+
+	.program-item.active {
+		border-color: #D2D2D2;
+		border-width: 2px;
+		color: #D2D2D2;
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	.item-content {
+		padding: 0 20px 0 20px;
+	}
+
+	.timefont {
+		font-size: 30px;
+		color: #A5A5A5;
+	}
+
+	.washing {
+		color: #F5A623;
+	}
+
+	.day-time1 {
+		font-size: 33px;
+		color: #A5A5A5;
+	}
+
+	.day-time2 {
+		color: #0080FF;
+		font-size: 35px;
+	}
+
+	.main-list {
+
+		flex: 1;
+	}
+
+	.machine {
+		font-size: 38px;
+		color: #333333;
+	}
+
+
+
+	.item-state {
+
+		flex: none;
+		border-radius: 100px;
+		padding: 5px 10px 5px 10px;
+		box-sizing: content-box;
+	}
+
+	.free {
+		background-color: #41B862;
+	}
+
+	.inwashing {
+		background-color: #F5A623;
+	}
+
+	.notdocimasy {
+		background-color: #0080FF;
+	}
+
+	.prepare {
+		background-color: #A5A5A5;
+	}
+</style>

@@ -1,0 +1,718 @@
+<template>
+	<div class="maincontent wrapper">
+		<div class="statusBar" style="flex:none;background-color: black;" :style="{height:statusBarHeight+'wx'}"></div>
+		<div class="home-content" >
+			<div class="headTitle">
+				<image class="headTitleimage" src="../../static/img/login-bg.png"></image>
+				<text class="headTitleText">消毒供应中心质量追溯系统</text>
+			</div>
+			<!-- 	 <div class="main-form" style="background-color: red;"> -->
+			<div class="home-form" style="position:relative;">
+				<div class="input-row">
+					<input class="input" type="text" v-model="dept" placeholder="科室" @input="onSearch" @blur="cleandeptfun"></input>
+					<!-- <vmodelselectComponent :placeholder="'科室'" :width="'200'" v-model="dept"  @click="showSelect('deptSelect')" :listshow="deptSelect" :search="true" @chose="onChoseKs" @input="onSearch" :dataList="dataList" :lable="'de_deptname'" ></vmodelselectComponent> -->
+				</div>
+
+				<div class="input-row">
+					<input class="input" ref="account" type="text" v-model="account" placeholder="用户名" />
+
+				</div>
+				<div class="input-row passwordinput" >
+					<input class="input-password"  type="password" v-model="password" placeholder="密码" />
+					 <image v-if="clearshow" @click="clearPassword()" class="passwordinput-image" src="../../static/img/closecilcre.png"></image>
+					<!-- <icon v-if="clearshow" class="clearIcon" @tap="clearPassword()" type="clear" size="22" /> -->
+				</div>
+				<div class="passwordError">
+					<text v-if="passwordError" class="errorpassword">用户名或密码错误</text>
+					<!-- 	<div v-show="pleasEnterInformation"></div> -->
+				</div>
+
+				<div class="btn-row flexcenter" @click="bindLogin">
+					<text class="btn-primary">登录</text>
+				</div>
+			
+		<!-- 		<scroller class="scroller" v-if="toggleList&&dept.length">
+					<div class="listItem" v-for="(item, itemIndex) in dataList" @click.stop="onChoseKs(item)" :key="itemIndex">
+						<text style="font-size:35px;">{{item.de_deptname}}</text>
+					</div>
+				</scroller> -->
+				<scrollerComponent :listshow="toggleList" @chose="onChoseKs"  :width="'580'" :height="'300'" :left="'50'" :top="'110'" :dataList="dataList" :lable="'de_deptname'"></scrollerComponent>
+			</div>
+			<!-- </div> -->
+
+			<div class="set-up">
+				<text class="text-first">医惠科技有限公司</text>
+				<text class="text-last" @click="seting">设置</text>
+			</div>
+
+			<div class="cover-ip" v-if="setipshow"  :style="{height:homeHeight+'wx'}" @click="emitClose(null)">
+				<div class="cover-content" @click="stoppropagation"> 
+					<text class="cover-content-set">设置:&nbsp;&nbsp;&nbsp;V3.1.0_88</text>
+					<div class="cover-content-form">
+						<text class="title">ip</text>
+						<input class="ip-input" type="text" v-model="endIp" placeholder="请输入服务器ip" />
+					</div>
+					<div class="cover-content-form">
+						<text class="title">端口号</text>
+						<input class="ip-input" type="number" v-model="endPort" placeholder="请输入服务器端口号" />
+					</div>
+					<div class="btn-row flexcenter" @click="emitClose($event)" style="text-align: center;margin-top:10px;">
+						<text class="sure-btn-row">确定</text>
+					</div>
+
+				</div>
+			</div>
+				<wxc-dialog :title="'更新'"
+			        :content="'检测到性版本，是否更新?'"
+			        :show="showDialog"
+					 @wxcDialogCancelBtnClicked="showDialog=false"
+			        @wxcDialogConfirmBtnClicked="download"
+			      ></wxc-dialog>
+			
+			<wxc-loading :show="loading"></wxc-loading>
+		</div>
+	</div>
+</template>
+<script>
+	 var modal = weex.requireModule('modal');
+	 const storage = weex.requireModule('storage')
+	// import store from '../../store'
+	let dataSource=[];
+
+
+
+	import {
+		login,
+		getDepts,
+		checkversion
+	} from "../../common/api.js";
+	import {
+		myMixin
+	} from "../../common/mixins.js";
+	 import { WxcLoading ,WxcDialog} from 'weex-ui';
+	  import scrollerComponent from '../_mods/scroller.nvue';
+
+
+	export default {
+		mixins: [myMixin],
+components: { scrollerComponent,WxcLoading,WxcDialog },
+
+		data() {
+			return {
+				animating:false,
+				endIp: '',
+				endPort: '',
+				dept: '',
+				statusBarHeight: '',
+				homeHeight: 100,
+
+				// accountFocus: false,
+				activeboradHeight: '',
+				providerList: [],
+				hasProvider: false,
+				account: '', //用户名
+				password: '', //密码
+				dept: '', //科室
+				positionTop: 0,
+				passwordError: false,
+				setipshow: false,
+				dataList: [],
+				toggleList: false,
+				currentDept: null,
+				version: '',
+				showDialog: false,
+				pleasEnterInformation: false,
+				versiondata: '',
+				loading:false,
+				res:''
+			}
+		},
+		computed: {
+			clearshow: function() {
+				return this.password != '';
+			}
+		},
+		watch: {
+			password(val, oldval) {
+				this.cleanError()
+			},
+		
+			account(val, oldval) {
+				this.cleanError()
+			}
+		
+		},
+		created() {
+			this.setbarheightself();
+			this.getdeptsbyip();
+			this.initip();
+		},
+
+		methods: {
+			stoppropagation(e){
+				e.stopPropagation();
+			},
+			emitClose(e) {
+				console.log('click');
+				if(e==null){
+					this.setipshow=false
+					return;
+				}
+				e.stopPropagation();
+				
+				if(this.endIp!=''&&this.endPort!=''){
+					this.setipshow=false
+					let tempip=this.endIp+':'+this.endPort;
+					uni.setStorage({
+						key: 'endIp',
+						data: tempip,
+						success:  (res)=> {
+							this.getDepts();
+						}
+					});
+				}else{
+					modal.toast({
+						message: 'ip和端口不能为空'
+					});
+				}
+				
+			},
+			initip(){
+				  uni.getStorage({
+					key: 'endIp',
+					success: (res)=> {
+						  setTimeout(()=>{
+							this.endIp=res.data.split(':')[0];
+							this.endPort=res.data.split(':')[1];
+						  },100)
+					}
+				  });
+			},
+
+
+			searchList(e) {
+				if(!dataSource.length){
+					modal.toast({
+						message: '科室获取失败!'
+					});
+					return;
+				}
+				this.searchDeptsthrottle(e, dataSource).then(res => {
+					this.dataList = res;
+				});
+				// this.kslist = this.searchDeptsthrottle(e, deptlist);
+			},
+
+			// 测试
+
+
+
+			cleandeptfun() {
+				this.toggleList = false;
+				console.log(this.currentDept, 'this.currentDept');
+				if (!this.currentDept) {
+					this.dept = '';
+					modal.toast({
+						message: '请选择科室'
+					});
+
+				}
+
+			},
+			checkupload() {
+				uni.getSystemInfo({
+					success: (res) => {
+						console.log(res.platform);
+						//检测当前平台，如果是安卓则启动安卓更新  
+						if (res.platform == "android") {
+							this.AndroidCheckUpdate();
+						}
+					}
+				})
+			},
+			download() {
+				this.showDialog = false;
+				 uni.postMessage({key: "downloadapp",value:this.versiondata});
+				
+
+			},
+			AndroidCheckUpdate: function() {
+			
+				var _this = this;
+				const data = {
+					"UpdateFilesSetting": {
+						"clientversioncode": "0",
+						"platformtype": "2"
+					},
+					"LoginForm": {}
+				};
+				checkversion(data).then(res => {
+					_this.showDialog = true;
+					console.log(res,'版本检测');
+					this.versiondata = res;
+// 					if (res.returnValue.UpdateFileList[0] && res.returnValue.UpdateFileList[0].versioncode > _this.version) {
+// 						_this.showDialog = true;
+// 						this.versiondata = res;
+// 
+// 					}
+				})
+			},
+
+			cleanError() {
+				this.passwordError = false;
+				this.pleasEnterInformation = false;
+			},
+			onSearch(e) {
+				this.currentDept = null;
+				if (!this.toggleList) {
+					this.toggleList = true;
+				}
+				this.searchDeptsthrottle(this.dept, dataSource).then(res => {
+					this.dataList = res;
+				});
+
+
+			},
+			onCloseSetip() {
+				this.setipshow = false;
+				this.$nextTick(() => {
+					this.getdeptsbyip();
+				})
+
+			},
+			seting() {
+				this.setipshow = true;
+			},
+			getDepts() {
+				const data = {
+					"Department": {}
+				};
+
+				this.loading=true;
+				getDepts(data).then((res)=>{
+				   console.log('res');
+					this.loading=false;
+					this.checkupload();
+					if (res.status == 'OK') {
+						dataSource = res.returnValue.DepartmentList.map(item => {
+							return {
+								de_alph: item.de_alph,
+								de_deptname: item.de_deptname,
+								de_deptid: item.de_deptid
+							};
+						});
+						storage.setItem('deptlist', dataSource, event => {})
+						 uni.postMessage({key: "deptlist",value:dataSource});
+						this.dataList = [].concat(dataSource).slice(0, 15);
+					}
+			
+				}).catch((error)=>{
+					modal.toast({
+						message: '网络连接失败！'
+					});
+					this.loading=false;})
+			},
+
+			onChoseKs(e) {
+				console.log(e);
+				this.dept = e.de_deptname;
+				this.currentDept = e;
+				this.toggleList = false;
+				this.$refs.account.focus();
+
+			},
+			clearPassword() {
+				this.password = '';
+			},
+			bindLogin() {
+
+				if (!this.currentDept) {
+					modal.toast({
+						message: '请选择科室'
+					});
+					return;
+				}
+				if (!this.account || !this.password) {
+					modal.toast({
+						message: '请输入用户名和密码'
+					});
+					return;
+				}
+				const data = {
+					"LoginForm": {
+						"deptId": this.currentDept.de_deptid,
+						"loginName": this.account,
+						"password": this.password
+					}
+				};
+
+			    this.loading=true;
+				login(data).then(res => {
+			
+					this.loading=false;
+					if (res.errorCode == '0') {
+						console.log(res.returnValue.LoginForm, 'res.returnValue.LoginForm');
+						 uni.postMessage({key: "loginform",value:res.returnValue.LoginForm});
+						 
+						uni.setStorage({//用于vue页面post
+							key: 'loginForm',
+							data: res.returnValue.LoginForm,
+							success:  (res)=> {
+							}
+						});
+						
+						storage.setItem('loginForm', res.returnValue.LoginForm, event => {})
+    
+						// uni.setStorageSync('loginForm', res.returnValue.LoginForm);
+						// this.setLoginForm(res.returnValue.LoginForm);
+						uni.redirectTo({
+							url: `/pages/home/home`
+						});
+					} else {
+						this.passwordError = true;
+					}
+				})
+
+
+			},
+			getdeptsbyip() {
+				uni.getStorage({
+					key: 'endIp',
+					success: (res) => {
+                     
+						this.getDepts();
+					},
+					fail: (e) => {
+						modal.toast({
+							message: '请设置ip'
+						});
+						this.setipshow = true;
+					}
+				});
+			},
+			setbarheightself() { //设置状态栏高度
+				let _t = this;
+				setTimeout(() => { //获取状态栏高度，setTimeout后才能调用uni.  
+					uni.getSystemInfo({
+						success: function(res) {
+							_t.statusBarHeight = res.statusBarHeight;
+							_t.homeHeight = res.windowHeight - res.statusBarHeight;
+							storage.setItem('statusBarHeight', res.statusBarHeight, event => {})
+							storage.setItem('mainContentHeight', _t.homeHeight, event => {})
+						}
+					});
+				}, 1);
+			},
+
+		},
+		mounted() {
+
+		}
+
+	}
+</script>
+
+<style>
+	.passwordinput-image{
+		width:50px;
+		height:50px;
+	}
+	.passwordinput{
+		display:flex;
+		flex-direction: row;
+		align-items: center;
+	}
+	.loading{
+		width: 150px;
+		height: 150px;
+        display:flex;
+	    align-items: center;
+		justify-content: center;
+		/* color: #FFFFFF; */
+		position:absolute;
+		left:300px;
+		top:325px;
+/* 		background-color: gray; */
+		/* background-color: red; */
+	
+		/* background-color: rgba(0,0,0,0.8); */
+		border-radius: 10px;
+		
+	}
+	.loading-image{
+		width: 100px;
+		height: 100px;
+		vertical-align: middle;
+	}
+	
+	 .indicator {
+
+		height: 80px;
+		width: 80px;
+		color: yellow;
+	  }
+	.main-form {
+		flex: 1;
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 750px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.maincontent {
+		display: flex;
+		flex: 1;
+		width: 750px;
+		flex-direction: column;
+
+	}
+
+	.home-content {
+		position: relative;
+		flex: 1;
+		width: 750px;
+		flex-direction: column;
+		justify-content: space-around;
+		align-items: center;
+
+	}
+
+	.headTitle {
+		margin-top: -100px;
+		position: relative;
+		/* 		padding-top: 50px;
+		height: ;
+		text-align: center;
+		background-color:green ;
+		width:750px; */
+		display: flex;
+
+
+
+	}
+
+	.headTitleimage {
+		width: 750px;
+		height: 500px;
+	}
+
+	.headTitleText {
+		position: absolute;
+		top: 150px;
+		left: 0;
+		right: 0;
+		font-size: 50px;
+		color: white;
+		text-align: center;
+		z-index: 10;
+	}
+
+	.home-form {
+		/* 		position: absolute;
+		top: 0;
+		right: 0;
+		left: 0;
+		bottom: 0; */
+
+		/* 	flex:none; */
+		border-color:#E5E5E5;
+		border-width:1px;
+		border-style: solid;
+
+		width: 700px;
+
+		height: 600px;
+		background-color: #FFFFFF;
+		margin-top: -200px;
+
+		border-radius: 4px;
+		align-items: center;
+
+	}
+
+	.input-row {
+		position: relative;
+		height: 120px;
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+		/* border-bottom-style: 2px solid #E5E5E5; */
+		margin: 0 40px;
+		width: 620px;
+	}
+
+	.input {
+		width: 580px;
+		height: 150px;
+		font-size: 40px;
+	}
+	.input-password{
+			width: 530px;
+			height: 150px;
+			font-size: 40px;
+			padding-left:20px;
+	}
+
+	.scroller {
+		height: 300px;
+		width: 580px;
+		top: 110px;
+		left: 50px;
+		position: absolute;
+		border-color:#E5E5E5;
+		border-width:1px;
+		border-style: solid;
+		border-radius: 5px;
+		background-color: white;
+	}
+
+	.listItem {
+		padding: 20px 0 20px 20px;
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+
+	}
+
+	.listItem:first-child {
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+
+	.btn-row {
+		background-color: #0faeff;
+		border-radius: 5px;
+		width: 620px;
+		height: 100px;
+	}
+
+	.flexcenter {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.btn-primary {
+		color: white;
+		font-size: 50px;
+	}
+
+	.passwordError {
+
+		width: 620px;
+
+		height: 60px;
+		line-height: 60px;
+		margin: 10px;
+
+	}
+
+	.errorpassword {
+		font-size: 35px;
+		color: red;
+	}
+
+	.set-up {
+
+		margin-top: 100px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-direction: row;
+
+
+
+		width: 750px;
+
+
+	}
+
+	.text-first {
+		font-size: 45px;
+		color: #A5A5A5;
+
+	}
+
+	.text-last {
+		font-size: 45px;
+		color: #0080FF;
+		margin-left: 10px;
+	}
+
+	.cover-ip {
+       background-color: rgba(0, 0, 0, 0.5);
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		width: 750px;
+		flex: 1;
+
+		/* background: rgba(0, 0, 0, 0.5); */
+
+	}
+
+	.cover-content {
+		height: 500px;
+		width: 750px;
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		background-color: #FFFFFF;
+		border-top-left-radius:20px;
+        border-top-right-radius: 20px;
+		display:flex;
+		align-items: center;
+		/* border-radius: 10px; */
+	/* 	border-radius: 50px 50px 0 0; */
+	}
+	.border-bottom{
+			border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+
+	.cover-content-set {
+	/* 	border-radius: 50px 50px 0 0; */
+		display: flex;
+		height: 120px;
+		width:690px;
+		line-height:120px;
+		align-items: center;
+		justify-content: center;
+		font-size: 28px;
+		color: #A5A5A5;
+		border-bottom-width: 2px;
+	    border-bottom-color: #E5E5E5;
+	    text-align: center;
+
+		margin: 0 30px;
+
+	}
+
+	.cover-content-form {
+		width:690px;
+		display: flex;
+		align-items: center;
+		flex-direction: row;
+		padding: 20px 0;
+
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+	.ip-input{
+		width:500px;
+		height:80px;
+	}
+	
+	.sure-btn-row{
+		color:white;
+		font-size:50px;
+	}
+
+	.title {
+		width: 170px;
+		padding-left: 20px;
+		flex: none;
+		font-size: 32px;
+		color: #A5A5A5;
+	}
+</style>

@@ -1,0 +1,241 @@
+<template>
+	<view style="width:750px;position:absolute;top:0;left:0;background-color: white;" :style="{height:mainContentHeight+'wx'}" @click="closeall">
+		<view class="head">
+			<text style="font-size:35px;" @click="closeAdd(false)">取消</text>
+			<text style="font-size:35px;">{{activeMachine.dev_name}}</text>
+			<!-- <text style="font-size:35px;" @click="closeAdd">确认</text> -->
+			<wxc-button text="确定" :disabled="disabledsure" type="blue" :btn-style="{width:'120px',height:'60px'}" :text-style="{fontSize:'30px',color:'white'}" @wxcButtonClicked="closeAdd(true)"></wxc-button>
+			<!-- <img src="../../static/img/i-close1.png" class="close-img" @click="closeAdd" alt=""> -->
+		</view>
+        <view class="reson-tip"><text style="font-size: 29px;color: #666666;">请选择换锅原因</text></view>
+		<scroller class="scroller" style="height:400px;width:750px;">
+			<view class="reson-list-item flexbetween border-bottom" v-for="(item,index) of potchangeResons" @click.stop="choseReson(item,index)" :key="index">
+				<text style="font-size:40px;">{{item.aaa103}}</text>	
+        	<image v-if="index==acresonindex" style="width:50px;height:33px;" src="../../static/img/i-Check.png" alt=""></image>
+
+			</view>
+		</scroller>
+		 <view class="reson-tip"><text style="font-size: 29px;color: #666666;">请选择清洗机</text></view>
+		<scroller class="scroller" style="flex:1;width:750px;">
+			<view class="reson-list-item flexbetween border-bottom"  v-for="(item,index) of changemachines" :key="index" @click.stop="choseMachine(item,index)">
+				<text style="font-size:40px;">{{item.name}}</text>
+        	<image  v-if="index==acmachineindex" style="width:50px;height:33px;" src="../../static/img/i-Check.png" alt=""></image>	
+			</view>
+		</scroller>
+          <wxc-loading :show="loading"></wxc-loading>
+			
+	</view>
+</template>
+
+<script>
+	import {WxcButton,WxcLoading} from 'weex-ui';
+	var modal = weex.requireModule('modal');
+	import {
+		publicSelect,updatesignMachine,potChange
+	} from "../../../common/api.js";
+	
+	
+		import {
+		myMixin
+	} from "../../../common/mixins.js";
+	import scrollerComponent from '../../_mods/scroller.nvue';
+	const storage = weex.requireModule('storage');
+
+	export default {
+		mixins: [myMixin],
+		components: {WxcButton,WxcLoading},
+		props: ['washstate'],
+	
+	
+		data() {
+			return {
+		        loginForm:{},
+				mainContentHeight:'2000',
+				activeMachine:{},
+				potchangeResons:[],
+				changemachines:[],
+				acresonindex:-1,
+				reson:'',
+				acmachineindex:-1,
+				aftermachine:'',
+				machine:'',
+				loading:false,
+				disabledsure:true
+
+			}
+		},
+		created(){
+
+			this.getmaincontentheight();
+            storage.getItem('activeWashmachine', event => {
+             	this.activeMachine = JSON.parse(event.data);
+             })
+			  storage.getItem('washmachineList', event => {
+				this.changemachines = JSON.parse(event.data).filter((item)=>{
+							return item.id!=this.activeMachine.dev_id;
+				});
+			  })
+			
+             
+             storage.getItem('loginForm', event => {
+             	this.loginForm = JSON.parse(event.data);
+				this.getpotchangeResons();
+             })
+		},
+		methods: {
+				potchange(){
+					if(!this.aftermachine){
+						modal.toast({message: "请选择清洗机"});
+						return;
+					}
+					let basedata={
+						"aft_d_gc":this.aftermachine.d_gc,
+						"aft_dev_id":this.aftermachine.dev_id,
+						"aft_dev_name":this.aftermachine.dev_name,
+						"aft_t_gc":this.aftermachine.t_gc,
+						"hgyy":this.reson?this.reson.aaa103:'',
+						"d_gc":this.activeMachine.d_gc,
+						"dev_id":this.activeMachine.dev_id,
+						"dev_name":this.activeMachine.dev_name,
+						"start_dt":this.activeMachine.start_dt,
+				
+						}
+						
+					if(this.washstate=='prepare'){//准备中换锅
+						Object.assign(basedata,{},{"isstart":"0"})
+					}
+					if(this.washstate=='washing'){//清洗中换锅
+						Object.assign(basedata,{},{"isstart":"1"})
+					}
+					console.log('basedata')
+					console.log(JSON.stringify(basedata))
+						const potchangeData={"Qx":basedata,"LoginForm":this.loginForm};
+						potChange(potchangeData).then(res=>{
+							// console.log(res,"换锅");
+							if(res.errorCode == "0"){
+								 uni.postMessage({key: "washmachine",value:this.activeMachine});
+								 uni.postMessage({key: "washmachine",value:this.aftermachine});
+								 
+								// this.$bus.emit('refreshItem',this.activeMachine);
+								uni.navigateBack({
+									delta: 1
+								});
+								this.$emit('onClosetemp');
+							}else{
+								modal.toast({message: res.message});
+							}
+						})
+						
+				},
+				getaftermachine(index){
+				
+					const data={"Qx":{"dev_id":this.machine.id},"LoginForm":this.loginForm};
+					this.loading=true;
+					updatesignMachine(data).then(res=>{
+						this.loading=false;
+						if(res.errorCode == "0"){
+							this.aftermachine=res.returnValue.qxjStateList[0];
+							
+							if(this.aftermachine.state_name=='待检定'||this.aftermachine.state_name=='清洗中'){
+								modal.toast({message: "该清洗机处于"+this.aftermachine.state_name+"不可换锅"});
+								// this.toast("该清洗机处于"+this.aftermachine.state_name+"不可换锅");
+								this.disabledsure=true;
+								this.acmachineindex=-1;
+								this.acresonindex=-1;
+								return;
+							}else{
+							    this.acmachineindex=index;	
+							}
+							
+							this.disabledsure=false;
+						}
+					}).catch((error)=>{this.loading=false;})
+			},
+			choseMachine(item,index){
+				if(this.acmachineindex==index){
+					this.acmachineindex=-1;
+					this.machine='';
+					this.aftermachine="";
+					return;
+				}
+				
+				this.machine=item;
+				this.getaftermachine(index);
+				
+			},
+	         choseReson(item,index){
+	         	if(this.acresonindex==index){
+	         		this.acresonindex=-1;
+	         		this.reson='';
+	         		return;
+	         	}
+	         	this.acresonindex=index;
+	         	this.reson=item;
+	         },
+			async getmaincontentheight(){
+				this.mainContentHeight=await this.getmainContentHeight();
+			},
+			closeAdd(flag){
+				if(flag){
+					this.potchange();
+					
+				}else{
+					this.$emit('onClosetemp');
+				}
+				
+			},
+			getpotchangeResons(){//获取换锅原因
+				const data={"AA10":{"aaa100":"HG_YY"},"LoginForm":this.loginForm};
+				publicSelect(data).then(res=>{
+					if(res.errorCode == "0"){
+						this.potchangeResons=res.returnValue.AA10List;
+					}
+				})
+			},
+
+		},
+		mounted(){
+					
+		},
+		destroyed(){
+// 			materiallist=[];
+// 			this.packId='';
+// 			this.tmid='';
+// 			this.materialNum=1;
+// 			this.price='';
+// 			this.mark='';
+// 			this.materialId="";
+// 			this.material='';
+// 			this.disabledpack=false;
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+
+<style scoped>
+	.reson-list-item {
+		padding: 20px 30px 20px 30px;
+
+	}
+	.aligncenter{
+		align-items: center;
+	}
+	.head {
+		height:90px;
+		
+		padding: 0 30px 0 30px;;
+		position: relative;
+		flex: none;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+	.reson-tip {
+		height:60px;
+		box-sizing: border-box;
+		background-color: #F3F3F3;
+		padding: 15px;
+	}
+	
+
+</style>

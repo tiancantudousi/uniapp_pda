@@ -1,0 +1,63 @@
+<template>
+	<view style="width:750px;padding-top:10px;padding-bottom: 10px;" class="list-item border-bottom" @click="detail">
+		 <view class="item-content">
+			 <view style="flex:1;">
+			 				
+							 <text class="same-fontsize">{{item.bmc}}</text>
+							 <text class="same-fontsize">{{item.js_dname}}</text>
+					
+			 				<!-- <text class="same-fontsize">{{item.xq_desp}}</text> -->
+			 </view>
+			  <text  class="more-fontsize">{{item.js_num}}</text>
+
+		 </view>
+     <image src="../../static/img/i-right.png" style="width:10px;height:20px;margin:0 20px 0 20px;" alt=""></image>
+	</view>
+</template>
+
+<script>
+	export default {
+		props:['item'],
+		created(){
+			console.log('item');
+			console.log(JSON.stringify(this.item))
+		},
+		methods:{
+			detail(){
+				this.$emit('detail',this.item);
+			}
+		}
+	}
+</script>
+
+<style>
+
+	 .border-bottom{
+		border-bottom-width: 2px;
+		border-bottom-color: #E5E5E5;
+	}
+   .timg-image{
+	 width:150px;
+	 height:150px;
+	 padding:15px;
+	 flex:none;
+   }
+   .item-content{
+	    padding-right:20px;
+		align-items: center;
+	   flex:1;
+	   flex-direction: row;
+   }
+   
+   .list-item{
+	   padding:0 20px 0 20px;
+	   flex-direction: row;
+	   align-items: center;
+   }
+   .more-fontsize{
+	  font-size:40px;
+   }
+   .same-fontsize{
+	   font-size:35px;
+   }
+</style>

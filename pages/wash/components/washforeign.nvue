@@ -1,0 +1,275 @@
+<template>
+	<view style="flex:1" @click="closeAllselect">
+		   
+			<view class="input-row flexbetween border-bottom">
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="startTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('start')" placeholder="日期" />
+            
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="endTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('end')" placeholder="日期" />
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+			</view>
+			<view class="flexaround input-row border-bottom" style="align-items: center;">
+				<view class="flexaround paddingimage" @click="showSelect('machineSelect')" style="flex:1;">
+					<text style="flex:1;height:60px;line-height:60px;font-size:35px;" :style="{'color':machine.id?'black':'gray'}">{{machine.name}}</text>
+					<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+				</view>
+				<view class="flexaround paddingimage" @click="showSelect('resultSelect')" style="flex:1;">
+					<text style="flex:1;height:60px;line-height:60px;font-size:35px;">{{result.title}}</text>
+					<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+				</view>
+				<wxc-button text="保存" type="blue" :btn-style="{width:'100px',height:'70px'}" :text-style="{fontSize:'30px',color:'white'}" @wxcButtonClicked="store"></wxc-button>
+			</view>
+                 <washforeignCheckall :item="{isChecked:checkall}" @checkall="onCheckall"></washforeignCheckall>
+			   
+				<scroller class="scroller" style="flex:1;width:750px;" @loadmore="scrolltoBottom" :loadmoreoffset="20">
+					<washforeignItem v-for="(item,index) in washforeignList" :item="item" :key="index"></washforeignItem>	
+					<loadingmore v-if="washforeignList.length" :loadingType="2"></loadingmore>
+				</scroller>
+			
+		 <scrollerComponent 
+		 :listshow="machineSelect"
+		  @chose="onChoosemachine"  
+		  :width="'400'" 
+		  :height="'400'" 
+		  :left="'20'" 
+		  :top="'170'" 
+		  :dataList="machineList" 
+		  :lable="'name'"></scrollerComponent> 
+		  	 <scrollerComponent 
+		  :listshow="resultSelect"
+		   @chose="onChooseResult"  
+		   :width="'370'" 
+		   :height="'400'" 
+		   :left="'350'" 
+		   :top="'170'" 
+		   :dataList="resultList" 
+		   :lable="'title'"></scrollerComponent> 
+		   
+		   
+		  
+		   <wxc-loading :show="loading"></wxc-loading>		
+		
+		<!--  <cencusDetail v-if="showdetailitem" :startTime="startTime" :endTime="endTime" @closeDetail="showdetailitem=false" :item="activeitem"></cencusDetail> -->
+	</view>
+</template>
+
+<script>
+	import scrollerComponent from '../../_mods/scroller.nvue';
+	import loadingmore from '../../_mods/loading-more.nvue';
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {formatDate} from "../../../common/tool.js";
+	import washforeignItem from "./washforeign-item.nvue";
+	import washforeignCheckall from "./washforeign-checkall.nvue";
+	import * as _ from '../../../common/lodash.min.js';
+	import {WxcLoading,WxcButton} from 'weex-ui';
+	import {
+		changewash,getforeignList,updatesignMachine
+		
+	} from "../../../common/api.js";
+	import {
+		myMixin
+	} from "../../../common/mixins.js";
+	import {
+		datewarnmixins
+	} from "../../../common/datewarnmixins.js";
+	
+	export default {
+		
+		mixins: [myMixin,datewarnmixins],
+		components: {scrollerComponent,WxcLoading,loadingmore,washforeignItem,WxcButton,washforeignCheckall},
+	
+		data() {
+			return {
+				page:1,
+				pageSize:20,
+                machineSelect:false,
+				loading:false,
+				startTime:formatDate(new Date(),"yyyy-MM-dd"),
+				endTime:formatDate(new Date(),"yyyy-MM-dd"),
+				loadingType:2,
+				machineList:[],
+				machine:{name:'请选择清洗机'},
+				washresultList:[],
+				result:{'title':'临时包'},
+				resultSelect:false,
+				resultList:[{title:'临时包'},{title:'外来包'},{title:'外来包归还'}],
+				checkall:false,
+				washforeignList:[]
+				
+			}
+		},
+		created(){
+			this.getsystime().then(res=>{
+				this.startTime=res.slice(0,11);
+				this.endTime=res.slice(0,11);
+				storage.getItem('loginForm', event => {
+				  this.loginForm = JSON.parse(event.data);
+				  this.getforeignList();
+				
+				})
+			})
+            storage.getItem('washmachineList', event => {
+             	this.machineList = JSON.parse(event.data)
+             })
+
+
+		},
+		methods:{
+			store(){
+				let packlist=this.washforeignList.filter(item=>{
+					return item.isChecked
+				})
+				if(!packlist.length){
+					modal.toast({message: '请选择包'});
+					return;
+				}
+				if(!this.machine.id){
+					modal.toast({message: '请选择清洗机'});
+					return;
+				}
+				this.loading=true;
+				const data={"Qx":
+				{"qx_type":this.result.title=="临时包"?'lsb':this.result.title=="外来包"?"wlb":"wlbgh",
+					"dev_id":this.machine.id,
+				"end_dt":this.endTime+" 23:59:59",
+				"start_dt":this.startTime+" 00:00:00"},
+				"zqxList":packlist,"LoginForm":this.loginForm};
+				changewash(data).then(res=>{
+					this.loading=false;
+					console.log('changewash')
+					console.log(JSON.stringify(res))
+					if (res.errorCode == "0") {
+						modal.toast({message: '保存成功'});
+						this.getforeignList();
+					}else{
+						modal.toast({message: res.message});
+					}
+				})
+			},
+			onCheckall(value){
+				 if(!this.washforeignList.length){
+						return;
+				}
+				this.checkall=!value;
+				this.washforeignList.forEach(item => {
+					item.isChecked = this.checkall ? true : false;
+				})
+			},
+			builddata(item){
+				 let data;
+				switch(item.title){ 
+					case "临时包":data={"Lsbqd":
+					{"jssj":this.endTime+" 23:59:59","kssj":this.startTime+" 00:00:00"},"method":"getLsbList"}; break;
+					case "外来包":data={"WlbDtl":{"jssj":this.endTime+" 23:59:59","kssj":this.startTime+" 00:00:00"},"method":"getWlbList"}; break;
+					case "外来包归还":data={"Wlbgh":{"jssj":this.endTime+" 23:59:59","kssj":this.startTime+" 00:00:00"},"method":"getWlbghList"}; break;
+				}
+				return data;
+			},
+			getforeignList() {
+				let args=this.builddata(this.result);
+				const data = {
+					"LoginForm": this.loginForm
+				};
+				this.loading=true;
+				getforeignList({...args,...data}).then(res => {
+					this.loading=false;
+					if (res.errorCode == "0") {
+						
+						if(this.result.title=='临时包'){
+							this.washforeignList=res.returnValue.lsbList.map(item=>{
+								return {b_num:item.b_num,bid:item.bid,bmc:item.bmc,isChecked:false}
+							})
+						}
+						if(this.result.title=='外来包'){
+								this.washforeignList=res.returnValue.wlbList.map(item=>{
+								return {b_num:item.b_num,bid:item.bid,bmc:item.bmc,isChecked:false}
+							})
+							
+						}
+						
+					}else{
+						modal.toast({message: res.message});
+					}
+					
+				})
+			},
+			datechange(timestate){
+				
+				if(this.warningdate({'start':this.startTime,'end':this.endTime})){
+					timestate=='end'?modal.toast({message:'结束时间不得小于开始时间！'}):modal.toast({message:'开始时间不得大于结束时间！'});
+					return;
+				}
+			    this.getforeignList();
+			},
+			closeAllselect(){
+				this.resultSelect=false;
+				this.machineSelect=false;
+			},
+			showSelect(name){
+			    if(name!="machineSelect"){
+					this.machineSelect=false;
+				}
+				if(name!="resultSelect"){
+					this.resultSelect=false;
+				}
+			    setTimeout(()=>{
+					this[name]=!this[name];
+				},20)
+				
+			},
+// 			scrolltoBottom(){
+// 				this.page++;
+// 			    this.loadingType=1;
+// 				this.getwashcensusList();
+// 			},
+
+			onChooseResult(item){
+				this.resultSelect=false;
+				this.result=item;
+				this.getforeignList();
+			},
+		
+		
+			onChoosemachine(item,index){
+				this.machineSelect=false;
+				
+				this.getaftermachine(item);
+			},	
+				getaftermachine(machine){
+					const data={"Qx":{"dev_id":machine.id},"LoginForm":this.loginForm};
+					this.loading=true;
+					updatesignMachine(data).then(res=>{
+						this.loading=false;
+						console.log('getaftermachine');
+						console.log(JSON.stringify(res));
+						if(res.errorCode == "0"){
+							if(res.returnValue.qxjStateList[0].state_name=='待检定'||res.returnValue.qxjStateList[0].state_name=='清洗中'){
+								modal.toast({message: "该清洗机处于"+res.returnValue.qxjStateList[0].state_name+"不可转清洗"});
+								return;
+							}else{
+								this.machine=machine;
+								// this.aftermachine=res.returnValue.qxjStateList[0];
+							}
+						}else{
+							modal.toast({message: res.message});
+						}
+					}).catch((error)=>{this.loading=false;})
+			},
+			
+			
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+<style scoped>
+	.cencus-font{
+		font-size: 80px;
+			color: #FFA613;
+	}
+
+</style>

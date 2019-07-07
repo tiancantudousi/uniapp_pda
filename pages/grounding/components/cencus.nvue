@@ -1,0 +1,224 @@
+<template>
+	<view style="flex:1" @click="closeSelect">
+	
+				
+			<view class="flexbetween border-bottom" style="height:200px;width:750px;padding-top:10px;padding-bottom:10px;">	
+				<view  style="flex:1;justify-content: center;align-items: center;">
+					<text class="cencus-font">{{todaystorage}}</text>
+					<text style="font-size:30px;">今日库存量</text>
+				</view>
+				<view style="flex:1;justify-content: center;align-items: center;">
+					<text class="cencus-font">{{totalstorage}}</text> 
+					<text style="font-size:30px;">总库存量</text>
+				</view>
+			</view>
+			<view class="flexaround input-row  border-bottom" style="justify-content: center;">
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="startTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('start')" placeholder="日期" />
+				        <image  src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+					<view class="flexcenter paddingimage" style="flex:1;align-items: center;">
+						<input v-model="endTime"  style="height:60px;flex:1;" class="input" type="date" @change="datechange('end')" placeholder="日期" />
+						<image  src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+			</view>
+			
+			<view class="input-row border-bottom" style="flex-direction: row;align-items: center;">
+				
+					<view class="flexaround paddingimage" style="width:375px;" @click="showSelect('beforeSelect')"> 
+						<text style="font-size:35px;">{{activebefore?activebefore.name:'请选择存储架子'}}</text> 
+						<image src="../../static/img/i-down1.png" class="image-down" alt=""></image>
+					</view>
+			
+			    <input style="height:60px;flex:1;margin-left:30px;" type="text" v-model="tmid" return-key-type="search" placeholder="请录入包ID" @return="initgetcensusList()"></input>
+			</view>
+			
+			
+	       
+			<view style="flex:1;">
+				<scroller class="scroller" @loadmore="scrolltoBottom" :loadmoreoffset="20">
+					<view v-for="(list,indextop) in groundingcencusList" :key="indextop">
+						<view class="border-bottom" style="flex-direction: row;padding:20px;">
+							<text style="font-size:30px;">{{list[0]}}</text>
+							<text style="font-size:30px;">(包数量({{list[1].length}}))</text>
+						</view>					
+					   <cencusItem  :item="item" v-for="(item,index) in list[1]" :key="index"></cencusItem>
+					
+					</view>
+					<!-- <loadingmore v-if="censusList.length" :loadingType="loadingType"></loadingmore> -->
+				</scroller>
+				
+ 
+			</view>
+			 <scrollerComponent  :listshow="beforeSelect" @chose="onChoosebefore"  :width="'420'" :height="'400'" :left="'20'" :top="'370'" :dataList="shelvesList" :lable="'name'"></scrollerComponent>
+			
+				<wxc-loading :show="loading"></wxc-loading>	
+		
+	
+	</view>
+</template>
+
+<script>
+	import scrollerComponent from '../../_mods/scroller.nvue';
+	// import loadingmore from '../../_mods/loading-more.nvue';
+		import { WxcLoading} from 'weex-ui';
+	var modal = weex.requireModule('modal');
+	const storage = weex.requireModule('storage');
+	import {formatDate} from "../../../common/tool.js";
+	import {
+		datewarnmixins
+	} from "../../../common/datewarnmixins.js";
+	import cencusItem from "./grounding-list-item.nvue";
+	import * as _ from '../../../common/lodash.min.js';
+	import {
+		getshelves,groundingcencus
+	} from "../../../common/api.js";
+	import {
+		myMixin
+	} from "../../../common/mixins.js";
+	
+	export default {
+		
+		mixins: [myMixin,datewarnmixins],
+		components: {scrollerComponent,WxcLoading,cencusItem},
+	
+		data() {
+			return {
+				todaystorage:0,
+				totalstorage:0,
+				startTime:'',
+				endTime:'',
+				page:1,
+				pageSize:20,
+				beforeSelect:false,
+				activebefore:'',
+				shelvesList:[],
+				groundingcencusList:[],
+				loginForm:{},
+				tmid:''
+				
+			}
+		},
+		created(){
+	        this.getsystime().then(res=>{
+				this.startTime=res.slice(0,11);
+				this.endTime=res.slice(0,11);
+				storage.getItem('loginForm', event => {
+				  this.loginForm = JSON.parse(event.data);
+				  this.getshelves();
+				  this.groundingcencus();
+				
+				})
+			})
+		},
+		methods:{
+				groundingcencus() {
+				const data = {
+					"Tmxx": {
+						"bnrList": [],
+						"end_dt_cc": this.endTime.trim()+" 23:59:59",
+						"isChecked": false,
+						"jsList": [],
+						"start_dt_cc": this.startTime.trim()+" 00:00:00",
+						"zjFfList": [],
+						"bid": this.tmid,
+						"cc_shelf_id": this.activebefore ? this.activebefore.id : ''
+					},
+					"PageReq": {
+						"page": this.page,
+						"rows": this.pageSize
+					},
+					"LoginForm": this.loginForm
+				};
+				console.log('groundingcencusdata')
+				console.log(JSON.stringify(data))
+
+				groundingcencus(data).then(res => {
+			         	console.log('groundingcencus')
+			         console.log(JSON.stringify(res))
+					if (res.status == "OK") {
+						if(!res.returnValue.rows ||!res.returnValue.rows.length){
+							if(this.page==1){
+								modal.toast({message: "未查询到相关记录!"});
+							}
+							return;
+						}
+						this.totalstorage=res.returnValue.total_num;
+						this.todaystorage=res.returnValue.today_num;
+						this.groundingcencusList=this.buildlistByshelves(res.returnValue.rows);
+					}
+				})
+			},
+			buildlistByshelves(list){
+				let deptnames=list.map((item)=>{
+					return item.cc_shelf_name;
+				});
+			
+				let unquname=_.uniq(deptnames);
+			
+				let afterbuildList=[];
+				unquname.forEach(item=>{
+					let templist=list.filter((element)=>{
+						return item==element.cc_shelf_name;
+					})
+					let templist2=[];
+					templist2[0]=item;
+					templist2[1]=templist;
+					afterbuildList.push(templist2);
+				})
+			
+				return afterbuildList;
+				
+			},
+			onChoosebefore(item) {
+				this.beforeSelect = false;
+				this.activebefore = item;
+				this.initgetcensusList();
+			},
+			getshelves(){
+				const data={"Jzxx":{"is_inv":"1"},"PageReq":{},"LoginForm":this.loginForm};
+				getshelves(data).then(res=>{
+					if(res.status=="OK"){
+						this.shelvesList=res.returnValue.rows;
+					}
+					if(res.status=="error"){
+						modal.toast({message: res.message});
+					}
+				})
+			},
+			closeSelect(){
+				this.beforeSelect=false;
+			},
+			showSelect(name) {
+				if (name != "beforeSelect") {
+					this.beforeSelect = false;
+				}
+				setTimeout(() => {
+					this[name] = !this[name];
+				}, 20)
+			
+			},
+			initgetcensusList(){
+				this.page=1;
+				this.groundingcencusList=[];
+				this.groundingcencus();
+			},
+			datechange(timestate){
+				
+				if(this.warningdate({'start':this.startTime,'end':this.endTime})){
+					timestate=='end'?modal.toast({message:'结束时间不得小于开始时间！'}):modal.toast({message:'开始时间不得大于结束时间！'});
+					return;
+				}
+			    this.initgetcensusList();
+			},
+		}
+	}
+</script>
+<style src="../../../common/base.css"></style>
+<style scoped>
+	.cencus-font{
+		font-size: 80px;
+			color: #FFA613;
+	}
+
+</style>
