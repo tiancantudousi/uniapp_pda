@@ -10,7 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "@dcloudio/uni-ui": "0.0.3",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.21",
     "qs": "^6.7.0",
     "vconsole": "^3.3.0",
     "vue-bus": "^1.2.1",
