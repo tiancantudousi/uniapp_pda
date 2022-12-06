@@ -11,7 +11,7 @@
   "dependencies": {
     "@dcloudio/uni-ui": "0.0.3",
     "lodash": "^4.17.11",
-    "qs": "^6.7.0",
+    "qs": "^6.7.3",
     "vconsole": "^3.3.0",
     "vue-bus": "^1.2.1",
     "weex-ui": "^0.6.14"
